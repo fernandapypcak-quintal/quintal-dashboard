@@ -6,14 +6,16 @@ import {
 } from 'recharts';
 import { DollarSign, Truck, Home, TrendingUp } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
+import { useMetas } from '../../hooks/useMetas';
 import KpiCard from '../ui/KpiCard';
+import { BigProgressBar } from '../ui/GoalProgress';
 import { CustomTooltip } from '../ui/ChartTooltip';
 import {
   sumValues, getMonthlyTotals, getDOWTotals, calcVariation,
   formatBRL, formatPercentPlain
 } from '../../utils/formatters';
 
-const COLORS = { casa: '#97A624', delivery: '#D9B504', total: '#0D0D0D' };
+const COLORS = { casa: '#97A624', delivery: '#D9B504' };
 
 const RADIAN = Math.PI / 180;
 function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
@@ -29,35 +31,41 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
 
 export default function Overview() {
   const { filteredData, rawData } = useFilters();
+  const { getMetaTotal } = useMetas();
+
+  const lojas = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
   const stats = useMemo(() => {
     const total = sumValues(filteredData);
     const casa  = sumValues(filteredData.filter(r => r.Canal === 'CASA'));
     const del   = sumValues(filteredData.filter(r => r.Canal === 'DELIVERY'));
-
-    // Use the latest month present in rawData as "current"
     const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
     const curKey  = allMonths[allMonths.length - 1];
     const prevKey = allMonths[allMonths.length - 2];
     const curMonth  = rawData.filter(r => r.Ano_Mes === curKey);
     const prevMonth = rawData.filter(r => r.Ano_Mes === prevKey);
     const momVar = calcVariation(sumValues(curMonth), sumValues(prevMonth));
-
-    // YoY: latest year vs previous year
     const allYears = [...new Set(rawData.map(r => r.Ano))].sort();
-    const curYear  = allYears[allYears.length - 1];
-    const prevYear = allYears[allYears.length - 2];
-    const curYearRecs  = rawData.filter(r => r.Ano === curYear);
-    const prevYearRecs = rawData.filter(r => r.Ano === prevYear);
-    const yoyVar = calcVariation(sumValues(curYearRecs), sumValues(prevYearRecs));
-
-    return {
-      total, casa, del, momVar, yoyVar,
+    const yoyVar = calcVariation(
+      sumValues(rawData.filter(r => r.Ano === allYears[allYears.length - 1])),
+      sumValues(rawData.filter(r => r.Ano === allYears[allYears.length - 2]))
+    );
+    return { total, casa, del, momVar, yoyVar, curKey,
       pctCasa: total > 0 ? (casa / total * 100) : 0,
       pctDel:  total > 0 ? (del  / total * 100) : 0,
-      curKey,
     };
   }, [filteredData, rawData]);
+
+  // Meta do mês mais recente
+  const metaMesAtual = useMemo(() => {
+    const key = stats.curKey;
+    if (!key) return null;
+    const meta = getMetaTotal(key, lojas);
+    if (!meta) return null;
+    const real = sumValues(rawData.filter(r => r.Ano_Mes === key));
+    const label = rawData.find(r => r.Ano_Mes === key)?.Ano_Mes_Label || key;
+    return { meta, real, label, key };
+  }, [stats.curKey, lojas, getMetaTotal, rawData]);
 
   const monthlyData = useMemo(() => getMonthlyTotals(filteredData).slice(-18), [filteredData]);
   const dowData     = useMemo(() => getDOWTotals(filteredData), [filteredData]);
@@ -67,19 +75,30 @@ export default function Overview() {
   ];
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="p-6 space-y-5 animate-fade-in">
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard title="Faturamento Total"  value={stats.total} icon={DollarSign} accent="#97A624"
           variation={stats.momVar} variationLabel="vs mês anterior" delay={0} />
-        <KpiCard title="Casa"    value={stats.casa} icon={Home}     accent="#8C1414"
+        <KpiCard title="Casa"     value={stats.casa} icon={Home}  accent="#8C1414"
           subtitle={`${formatPercentPlain(stats.pctCasa)} do total`} delay={80} />
-        <KpiCard title="Delivery" value={stats.del} icon={Truck}    accent="#D9B504"
+        <KpiCard title="Delivery" value={stats.del}  icon={Truck} accent="#D9B504"
           subtitle={`${formatPercentPlain(stats.pctDel)} do total`} delay={160} />
         <KpiCard title="Crescimento YoY" value={stats.yoyVar} format="percent"
           icon={TrendingUp} accent="#97A624"
           variation={stats.yoyVar} variationLabel="ano corrente vs anterior" delay={240} />
       </div>
+
+      {/* Progresso da meta do mês atual */}
+      {metaMesAtual && (
+        <BigProgressBar
+          label={`Meta — ${metaMesAtual.label}`}
+          sublabel="Progresso do mês mais recente"
+          realizado={metaMesAtual.real}
+          meta={metaMesAtual.meta}
+          delay={300}
+        />
+      )}
 
       {/* Monthly area chart */}
       <div className="chart-card animate-slide-up" style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
