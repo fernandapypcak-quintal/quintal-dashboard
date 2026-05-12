@@ -9,7 +9,7 @@
 export const DATA_CONFIG = {
 
   // ─── OPÇÃO 1: CSV local (padrão — arquivo em /public/data.csv) ─────────────
-  SOURCE: 'csv',
+  SOURCE: 'sheets',
   CSV_PATH: '/data.csv',
 
   // ─── OPÇÃO 2: Google Sheets ─────────────────────────────────────────────────
@@ -20,7 +20,7 @@ export const DATA_CONFIG = {
   // 4. Mude SOURCE para 'sheets'
   //
   // SOURCE: 'sheets',
-  SHEETS_URL: '',
+  SHEETS_URL: 'https://script.google.com/macros/s/AKfycbykKgqbmU76C5l0vB_sE7p77kcoDqXBzbacMOjhzaD3Twrgn3GJktMe-rMoxrM1pR8U/exec',
   // Exemplo de URL:
   // 'https://docs.google.com/spreadsheets/d/SEU_ID/export?format=csv&gid=0'
   //
