@@ -1,6 +1,7 @@
 // src/components/layout/Header.jsx
-import { Filter, X, RefreshCw } from 'lucide-react';
+import { Filter, X } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
+import MultiSelect from '../ui/MultiSelect';
 
 const PAGE_TITLES = {
   overview: 'Visão Geral',
@@ -8,22 +9,19 @@ const PAGE_TITLES = {
   yoy:      'Ano vs Ano',
   weekly:   'Semanal',
   stores:   'Por Loja',
+  metas:    'Metas',
   history:  'Histórico',
 };
 
 export default function Header({ activePage }) {
-  const { filters, meta, updateFilter, resetFilters } = useFilters();
+  const { filters, meta, updateFilter, resetFilters, hasActiveFilters } = useFilters();
 
-  const hasActiveFilters = Object.entries(filters).some(([k, v]) => {
-    if (k === 'loja' && v !== 'Todas') return true;
-    if (k === 'canal' && v !== 'Todos') return true;
-    if (k === 'ano' && v !== 'Todos') return true;
-    if (k === 'mes' && v !== 'Todos') return true;
-    return false;
-  });
+  const lojaOptions = meta.lojas.map(l => ({ value: l, label: l }));
+  const mesOptions  = meta.meses.map(m => ({ value: m.num, label: m.nome }));
 
   return (
-    <header className="sticky top-0 z-10 bg-surface-base/80 backdrop-blur-md border-b border-surface-border px-6 py-3 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-20 bg-surface-base/90 backdrop-blur-md border-b border-surface-border px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
+
       {/* Title */}
       <div className="flex items-center gap-3">
         <h1 className="text-base font-semibold text-brand-black font-display">
@@ -38,17 +36,16 @@ export default function Header({ activePage }) {
       <div className="flex items-center gap-2 flex-wrap justify-end">
         <Filter size={13} className="text-zinc-400 hidden sm:block" />
 
-        {/* Loja */}
-        <select
-          value={filters.loja}
-          onChange={e => updateFilter('loja', e.target.value)}
-          className="filter-select"
-        >
-          <option value="Todas">Todas as lojas</option>
-          {meta.lojas.map(l => <option key={l} value={l}>{l}</option>)}
-        </select>
+        {/* Lojas — multi-select */}
+        <MultiSelect
+          options={lojaOptions}
+          selected={filters.lojas}
+          onChange={val => updateFilter('lojas', val)}
+          placeholder="Todas as lojas"
+          allLabel="Todas as lojas"
+        />
 
-        {/* Canal */}
+        {/* Canal — single select (still makes sense) */}
         <select
           value={filters.canal}
           onChange={e => updateFilter('canal', e.target.value)}
@@ -59,7 +56,7 @@ export default function Header({ activePage }) {
           <option value="DELIVERY">Delivery</option>
         </select>
 
-        {/* Ano */}
+        {/* Ano — single select */}
         <select
           value={filters.ano}
           onChange={e => updateFilter('ano', e.target.value)}
@@ -69,15 +66,14 @@ export default function Header({ activePage }) {
           {meta.anos.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
 
-        {/* Mês */}
-        <select
-          value={filters.mes}
-          onChange={e => updateFilter('mes', e.target.value)}
-          className="filter-select"
-        >
-          <option value="Todos">Todos os meses</option>
-          {meta.meses.map(m => <option key={m.num} value={m.num}>{m.nome}</option>)}
-        </select>
+        {/* Meses — multi-select */}
+        <MultiSelect
+          options={mesOptions}
+          selected={filters.meses}
+          onChange={val => updateFilter('meses', val)}
+          placeholder="Todos os meses"
+          allLabel="Todos os meses"
+        />
 
         {/* Reset */}
         {hasActiveFilters && (
