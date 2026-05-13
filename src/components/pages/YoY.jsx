@@ -64,26 +64,45 @@ export default function YoY() {
   // Annual totals (always full, with note for current year)
   const annualTotals = useMemo(() => {
     return years.map((year, i) => {
-      const recs = filteredData.filter(r => r.Ano === year);
+      const isCurrentYear = cutoff && year === cutoff.year;
+
+      // When adjusted, cut all years to the same period as the current year
+      // (up to cutoff.month / cutoff.day)
+      const cutRecs = (recs) => {
+        if (!adjusted || !cutoff) return recs;
+        return recs.filter(r =>
+          r.Mes < cutoff.month ||
+          (r.Mes === cutoff.month && r.Dia <= cutoff.day)
+        );
+      };
+
+      const allRecs = filteredData.filter(r => r.Ano === year);
+      const recs    = cutRecs(allRecs);
+
       const total = sumValues(recs);
       const casa  = sumValues(recs.filter(r => r.Canal === 'CASA'));
       const del   = sumValues(recs.filter(r => r.Canal === 'DELIVERY'));
-      const prevYear = years[i - 1];
-      const prevRecs = prevYear ? filteredData.filter(r => r.Ano === prevYear) : [];
 
-      // Adjusted: compare same period in previous year
-      let growth = calcVariation(total, sumValues(prevRecs));
+      const prevYear = years[i - 1];
+      const prevRecs = prevYear ? cutRecs(filteredData.filter(r => r.Ano === prevYear)) : [];
+
+      const growth    = calcVariation(total, sumValues(prevRecs));
+
+      // growthAdj = same as growth when adjusted is on (already cut),
+      // otherwise compute it separately for the table column
       let growthAdj = null;
-      if (adjusted && cutoff && prevYear) {
-        const curPeriod  = recs; // already partial (only has data up to today)
-        const prevPeriod = filteredData.filter(r =>
+      if (!adjusted && cutoff && prevYear) {
+        const curCut  = filteredData.filter(r =>
+          r.Ano === year &&
+          (r.Mes < cutoff.month || (r.Mes === cutoff.month && r.Dia <= cutoff.day))
+        );
+        const prevCut = filteredData.filter(r =>
           r.Ano === prevYear &&
           (r.Mes < cutoff.month || (r.Mes === cutoff.month && r.Dia <= cutoff.day))
         );
-        growthAdj = calcVariation(sumValues(curPeriod), sumValues(prevPeriod));
+        growthAdj = calcVariation(sumValues(curCut), sumValues(prevCut));
       }
 
-      const isCurrentYear = cutoff && year === cutoff.year;
       return { year, total, casa, del, growth, growthAdj, isCurrentYear };
     });
   }, [filteredData, years, adjusted, cutoff]);
@@ -263,9 +282,11 @@ export default function YoY() {
       <div className="chart-card">
         <h3 className="section-title mb-1">Faturamento Anual — Casa vs Delivery</h3>
         <p className="text-xs text-zinc-400 mb-5">
-          {annualTotals.some(a => a.isCurrentYear)
-            ? `* ${cutoff?.year} inclui apenas dados até ${partialLabel}`
-            : 'Composição por canal em cada ano'}
+          {adjusted && cutoff
+            ? `Todos os anos cortados no mesmo período — ${partialLabel}`
+            : annualTotals.some(a => a.isCurrentYear)
+              ? `* ${cutoff?.year} inclui apenas dados até ${partialLabel}`
+              : 'Composição por canal em cada ano'}
         </p>
         <ResponsiveContainer width="100%" height={240}>
           <BarChart data={annualTotals} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
