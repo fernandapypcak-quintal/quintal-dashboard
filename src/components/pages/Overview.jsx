@@ -136,18 +136,19 @@ export default function Overview() {
     if (!periodo) return [];
     const monthly = getMonthlyTotals(filteredData).slice(-18);
     return monthly.map(m => {
-      const prevYearTotal = sumValues(
-        rawData.filter(r => r.Ano === m.ano - 1 && r.Mes === m.mes)
-      );
-      // Se mês incompleto, corta o ano anterior no mesmo dia
-      const prevYearCut = (periodo.isIncomplete && m.key === periodo.latestKey)
-        ? sumValues(rawData.filter(r =>
-            r.Ano === m.ano - 1 && r.Mes === m.mes && r.Dia <= periodo.lastDay
-          ))
-        : prevYearTotal;
+      // Só mostra linha do ano anterior se existirem dados reais
+      const prevYearRecs = rawData.filter(r => r.Ano === m.ano - 1 && r.Mes === m.mes);
+      const hasPrevData  = prevYearRecs.length > 0;
+      const prevYearValue = !hasPrevData
+        ? null
+        : (periodo.isIncomplete && m.key === periodo.latestKey)
+          ? sumValues(rawData.filter(r =>
+              r.Ano === m.ano - 1 && r.Mes === m.mes && r.Dia <= periodo.lastDay
+            ))
+          : sumValues(prevYearRecs);
       return {
         ...m,
-        prevYear: prevYearCut,
+        prevYear: prevYearValue,
         prevYearLabel: `${m.mes_nome || m.label.split('/')[0]}/${String(m.ano - 1).slice(2)}`,
       };
     });
