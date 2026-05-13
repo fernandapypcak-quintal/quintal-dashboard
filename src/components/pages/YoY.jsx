@@ -1,9 +1,11 @@
 // src/components/pages/YoY.jsx
 import { useMemo, useState } from 'react';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Legend, ReferenceLine
+  ComposedChart, LineChart, Line, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Legend, ReferenceLine, Cell, LabelList, PieChart, Pie
 } from 'recharts';
+import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
 import { CustomTooltip } from '../ui/ChartTooltip';
 import { sumValues, formatBRL, formatPercentPlain, calcVariation, formatPercent } from '../../utils/formatters';
@@ -12,7 +14,17 @@ import { TrendingUp, TrendingDown, Info, Scissors } from 'lucide-react';
 const YEAR_COLORS = ['#0D0D0D', '#97A624', '#D9B504', '#8C1414'];
 const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+
+const BRLk = v => v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1).replace('.',',')+'M' : v >= 1e3 ? 'R$ '+(v/1e3).toFixed(0)+'k' : 'R$ '+v.toFixed(0);
+function CLabel({ x, y, width, value, showLabels, pct }) {
+  if (!showLabels || value === null || value === undefined || value === 0) return null;
+  const display = pct ? (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%' : BRLk(value);
+  const color = pct ? (value >= 0 ? '#059669' : '#dc2626') : '#52525B';
+  return <text x={(x||0)+(width||0)/2} y={pct && value < 0 ? (y||0)+14 : (y||0)-5} textAnchor="middle" fontSize={10} fontWeight={500} fill={color} fontFamily="DM Sans">{display}</text>;
+}
+
 export default function YoY() {
+  const { showLabels } = useLabels();
   const { filteredData, rawData } = useFilters();
   const [view, setView]       = useState('total');
   const [adjusted, setAdjusted] = useState(false); // false = completo, true = ajustado
@@ -294,8 +306,12 @@ export default function YoY() {
             <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#A1A1AA' }} axisLine={false} tickLine={false} />
             <YAxis tickFormatter={v => formatBRL(v, true)} tick={{ fontSize: 11, fill: '#A1A1AA' }} axisLine={false} tickLine={false} width={76} />
             <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="casa" name="Casa"     fill="#97A624" radius={[0,0,0,0]} stackId="a" maxBarSize={60} />
-            <Bar dataKey="del"  name="Delivery" fill="#D9B504" radius={[4,4,0,0]} stackId="a" maxBarSize={60} />
+            <Bar dataKey="casa" name="Casa"     fill="#97A624" radius={[0,0,0,0]} stackId="a" maxBarSize={60}>
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
+            <Bar dataKey="del"  name="Delivery" fill="#D9B504" radius={[4,4,0,0]} stackId="a" maxBarSize={60}>
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>

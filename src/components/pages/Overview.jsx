@@ -2,9 +2,10 @@
 import { useMemo } from 'react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LabelList
 } from 'recharts';
 import { DollarSign, Truck, Home, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
 import { useMetas } from '../../hooks/useMetas';
 import KpiCard from '../ui/KpiCard';
@@ -35,7 +36,17 @@ function lastDayOf(recs) {
   return Math.max(...recs.map(r => r.Dia));
 }
 
+
+const BRLk = v => v >= 1e6 ? 'R$\xa0'+(v/1e6).toFixed(1).replace('.',',')+'M' : v >= 1e3 ? 'R$\xa0'+(v/1e3).toFixed(0)+'k' : 'R$\xa0'+v.toFixed(0);
+function CLabel({ x, y, width, value, showLabels, pct }) {
+  if (!showLabels || value === null || value === undefined || value === 0) return null;
+  const display = pct ? (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%' : BRLk(value);
+  const color = pct ? (value >= 0 ? '#059669' : '#dc2626') : '#52525B';
+  return <text x={(x||0) + (width||0)/2} y={pct && value < 0 ? (y||0)+14 : (y||0)-5} textAnchor="middle" fontSize={10} fontWeight={500} fill={color} fontFamily="DM Sans">{display}</text>;
+}
+
 export default function Overview() {
+  const { showLabels } = useLabels();
   const { filteredData, rawData } = useFilters();
   const { getMetaTotal } = useMetas();
   const lojas = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
@@ -378,7 +389,9 @@ export default function Overview() {
               <YAxis tickFormatter={v => formatBRL(v, true)} tick={{ fontSize: 11, fill: '#A1A1AA' }} axisLine={false} tickLine={false} width={76} />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="casa"     name="Casa"     fill="#97A624" radius={[4,4,0,0]} maxBarSize={32} />
-              <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[4,4,0,0]} maxBarSize={32} />
+              <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[4,4,0,0]} maxBarSize={32}>
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} />} />
+            </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>

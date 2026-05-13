@@ -1,9 +1,11 @@
 // src/components/pages/Stores.jsx
 import { useMemo } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+  ComposedChart, LineChart, Line, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Legend, ReferenceLine, Cell, LabelList, PieChart, Pie
 } from 'recharts';
+import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
 import { CustomTooltip } from '../ui/ChartTooltip';
 import {
@@ -14,7 +16,17 @@ import { Store, TrendingUp, TrendingDown } from 'lucide-react';
 
 const STORE_COLORS = ['#97A624', '#D9CB04', '#D9B504', '#8C1414'];
 
+
+const BRLk = v => v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1).replace('.',',')+'M' : v >= 1e3 ? 'R$ '+(v/1e3).toFixed(0)+'k' : 'R$ '+v.toFixed(0);
+function CLabel({ x, y, width, value, showLabels, pct }) {
+  if (!showLabels || value === null || value === undefined || value === 0) return null;
+  const display = pct ? (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%' : BRLk(value);
+  const color = pct ? (value >= 0 ? '#059669' : '#dc2626') : '#52525B';
+  return <text x={(x||0)+(width||0)/2} y={pct && value < 0 ? (y||0)+14 : (y||0)-5} textAnchor="middle" fontSize={10} fontWeight={500} fill={color} fontFamily="DM Sans">{display}</text>;
+}
+
 export default function Stores() {
+  const { showLabels } = useLabels();
   const { filteredData } = useFilters();
 
   const storeTotals = useMemo(() => getStoreTotals(filteredData), [filteredData]);

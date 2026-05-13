@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { FilterProvider, useFilters } from './hooks/useFilters';
 import { MetasProvider } from './hooks/useMetas';
+import { LabelsProvider } from './hooks/useLabels';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import Overview from './components/pages/Overview';
@@ -14,13 +15,8 @@ import History from './components/pages/History';
 import LoadingScreen, { ErrorScreen } from './components/ui/LoadingScreen';
 
 const PAGES = {
-  overview: Overview,
-  trend:    Trend,
-  yoy:      YoY,
-  weekly:   Weekly,
-  stores:   Stores,
-  metas:    Metas,
-  history:  History,
+  overview: Overview, trend: Trend, yoy: YoY,
+  weekly: Weekly, stores: Stores, metas: Metas, history: History,
 };
 
 function Dashboard() {
@@ -48,7 +44,9 @@ export default function App() {
   return (
     <FilterProvider>
       <MetasProvider>
-        <Dashboard />
+        <LabelsProvider>
+          <Dashboard />
+        </LabelsProvider>
       </MetasProvider>
     </FilterProvider>
   );

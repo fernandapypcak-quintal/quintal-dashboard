@@ -1,10 +1,12 @@
 // src/components/pages/Trend.jsx
 import { useMemo } from 'react';
 import {
-  ComposedChart, Line, Bar, BarChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine, Cell
+  ComposedChart, LineChart, Line, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Legend, ReferenceLine, Cell, LabelList, PieChart, Pie
 } from 'recharts';
 import { TrendingUp, TrendingDown, Calendar, Target } from 'lucide-react';
+import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
 import { useMetas } from '../../hooks/useMetas';
 import { CustomTooltip } from '../ui/ChartTooltip';
@@ -22,7 +24,17 @@ function daysInMonth(year, month) {
 const DOW_LABELS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 const DOW_ABREV  = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
+
+const BRLk = v => v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1).replace('.',',')+'M' : v >= 1e3 ? 'R$ '+(v/1e3).toFixed(0)+'k' : 'R$ '+v.toFixed(0);
+function CLabel({ x, y, width, value, showLabels, pct }) {
+  if (!showLabels || value === null || value === undefined || value === 0) return null;
+  const display = pct ? (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%' : BRLk(value);
+  const color = pct ? (value >= 0 ? '#059669' : '#dc2626') : '#52525B';
+  return <text x={(x||0)+(width||0)/2} y={pct && value < 0 ? (y||0)+14 : (y||0)-5} textAnchor="middle" fontSize={10} fontWeight={500} fill={color} fontFamily="DM Sans">{display}</text>;
+}
+
 export default function Trend() {
+  const { showLabels } = useLabels();
   const { filteredData, rawData } = useFilters();
   const { getMeta } = useMetas();
 
@@ -309,8 +321,12 @@ export default function Trend() {
                 );
               }}
             />
-            <Bar dataKey="mediaPrev" name={`Média ${periodoInfo.ano - 1}`} fill="#E8E8E2" radius={[3,3,0,0]} maxBarSize={28} />
-            <Bar dataKey="mediaCur"  name={`Média ${periodoInfo.ano}`}     fill="#97A624" radius={[3,3,0,0]} maxBarSize={28} />
+            <Bar dataKey="mediaPrev" name={`Média ${periodoInfo.ano - 1}`} fill="#E8E8E2" radius={[3,3,0,0]} maxBarSize={28}>
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
+            <Bar dataKey="mediaCur"  name={`Média ${periodoInfo.ano}`}     fill="#97A624" radius={[3,3,0,0]} maxBarSize={28}>
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
 

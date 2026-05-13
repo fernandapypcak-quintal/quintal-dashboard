@@ -1,16 +1,28 @@
 // src/components/pages/Weekly.jsx
 import { useMemo } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine
+  ComposedChart, LineChart, Line, BarChart, Bar, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Legend, ReferenceLine, Cell, LabelList, PieChart, Pie
 } from 'recharts';
+import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
 import { CustomTooltip } from '../ui/ChartTooltip';
 import { getWeeklyTotals, getDOWTotals, formatBRL, calcVariation, formatPercent } from '../../utils/formatters';
 import KpiCard from '../ui/KpiCard';
 import { Calendar, TrendingUp, Home, Truck } from 'lucide-react';
 
+
+const BRLk = v => v >= 1e6 ? 'R$ '+(v/1e6).toFixed(1).replace('.',',')+'M' : v >= 1e3 ? 'R$ '+(v/1e3).toFixed(0)+'k' : 'R$ '+v.toFixed(0);
+function CLabel({ x, y, width, value, showLabels, pct }) {
+  if (!showLabels || value === null || value === undefined || value === 0) return null;
+  const display = pct ? (value >= 0 ? '+' : '') + value.toFixed(1).replace('.', ',') + '%' : BRLk(value);
+  const color = pct ? (value >= 0 ? '#059669' : '#dc2626') : '#52525B';
+  return <text x={(x||0)+(width||0)/2} y={pct && value < 0 ? (y||0)+14 : (y||0)-5} textAnchor="middle" fontSize={10} fontWeight={500} fill={color} fontFamily="DM Sans">{display}</text>;
+}
+
 export default function Weekly() {
+  const { showLabels } = useLabels();
   const { filteredData } = useFilters();
 
   const weekly = useMemo(() => getWeeklyTotals(filteredData), [filteredData]);
@@ -62,8 +74,12 @@ export default function Weekly() {
             <YAxis tickFormatter={v => formatBRL(v, true)} tick={{ fontSize: 11, fill: '#A1A1AA' }} axisLine={false} tickLine={false} width={72} />
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine y={avgWeekly} stroke="#D9B504" strokeDasharray="5 5" strokeWidth={1.5} />
-            <Bar dataKey="casa" name="Casa" fill="#97A624" stackId="a" />
-            <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[4, 4, 0, 0]} stackId="a" maxBarSize={48} />
+            <Bar dataKey="casa" name="Casa" fill="#97A624" stackId="a">
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
+            <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[4, 4, 0, 0]} stackId="a" maxBarSize={48}>
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -79,8 +95,12 @@ export default function Weekly() {
               <XAxis type="number" tickFormatter={v => formatBRL(v, true)} tick={{ fontSize: 10, fill: '#A1A1AA' }} axisLine={false} tickLine={false} />
               <YAxis type="category" dataKey="label" tick={{ fontSize: 12, fill: '#52525B' }} axisLine={false} tickLine={false} width={28} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="casa" name="Casa" fill="#97A624" stackId="a" />
-              <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[0, 4, 4, 0]} stackId="a" />
+              <Bar dataKey="casa" name="Casa" fill="#97A624" stackId="a">
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
+              <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[0, 4, 4, 0]} stackId="a">
+              <LabelList content={props => <CLabel {...props} showLabels={showLabels} pct={false} />} />
+            </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
