@@ -4,7 +4,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import { DollarSign, Truck, Home, TrendingUp, TrendingDown, Minus, Calendar } from 'lucide-react';
+import { DollarSign, Truck, Home, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
 import { useMetas } from '../../hooks/useMetas';
 import KpiCard from '../ui/KpiCard';
@@ -16,8 +16,8 @@ import {
 } from '../../utils/formatters';
 
 const COLORS = { casa: '#97A624', delivery: '#D9B504' };
-
 const RADIAN = Math.PI / 180;
+
 function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
   const r = innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + r * Math.cos(-midAngle * RADIAN);
@@ -29,139 +29,192 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
   ) : null;
 }
 
-// Mini spark bar inside trend strip
-function MiniBar({ pct }) {
-  const color = pct > 0 ? '#97A624' : pct < 0 ? '#8C1414' : '#D4D4D0';
-  const h = Math.min(Math.abs(pct) * 1.2, 32);
-  return (
-    <div className="flex items-end justify-center" style={{ height: 36 }}>
-      <div className="w-1.5 rounded-t-sm" style={{ height: h, backgroundColor: color, minHeight: 3 }} />
-    </div>
-  );
+// Dado um conjunto de registros, retorna o último dia com dados
+function lastDayOf(recs) {
+  if (!recs.length) return null;
+  return Math.max(...recs.map(r => r.Dia));
 }
 
 export default function Overview() {
   const { filteredData, rawData } = useFilters();
   const { getMetaTotal } = useMetas();
-
   const lojas = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
-  // ── Core stats ────────────────────────────────────────────────
+  // ── Detecta o período do filteredData ──────────────────────────
+  // Se há filtro de mês, o "período" é esse mês. Senão, é o mês mais recente nos dados filtrados.
+  const periodoInfo = useMemo(() => {
+    if (!filteredData.length) return null;
+
+    // Meses presentes no filteredData
+    const meses = [...new Set(filteredData.map(r => r.Ano_Mes))].sort();
+    const latestKey = meses[meses.length - 1];
+    const [anoStr, mesStr] = latestKey.split('-');
+    const ano = Number(anoStr);
+    const mes = Number(mesStr);
+
+    // Registros do mês mais recente no filtro
+    const recsLatest = filteredData.filter(r => r.Ano_Mes === latestKey);
+    const lastDay = lastDayOf(recsLatest);
+
+    // O mês mais recente em TODO o rawData (para saber se está incompleto)
+    const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
+    const globalLatestKey = allMonths[allMonths.length - 1];
+    const isIncomplete = latestKey === globalLatestKey; // só o último mês global é incompleto
+
+    const label = recsLatest[0]?.Ano_Mes_Label || latestKey;
+
+    return { latestKey, ano, mes, lastDay, isIncomplete, label };
+  }, [filteredData, rawData]);
+
+  // ── Stats principais com corte de período correto ──────────────
   const stats = useMemo(() => {
+    if (!periodoInfo) return null;
+    const { latestKey, mes, lastDay, isIncomplete } = periodoInfo;
+
     const total = sumValues(filteredData);
     const casa  = sumValues(filteredData.filter(r => r.Canal === 'CASA'));
     const del   = sumValues(filteredData.filter(r => r.Canal === 'DELIVERY'));
 
-    const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
-    const curKey  = allMonths[allMonths.length - 1];
-    const prevKey = allMonths[allMonths.length - 2];
-    const curMonth  = rawData.filter(r => r.Ano_Mes === curKey);
-    const prevMonth = rawData.filter(r => r.Ano_Mes === prevKey);
-    const momVar = calcVariation(sumValues(curMonth), sumValues(prevMonth));
+    // MoM — mês anterior, cortado no mesmo dia se incompleto
+    const meses = [...new Set(filteredData.map(r => r.Ano_Mes))].sort();
+    const prevKey = meses[meses.length - 2];
+    let momVar = null;
+    if (prevKey) {
+      const prevRecs = isIncomplete
+        ? filteredData.filter(r => r.Ano_Mes === prevKey && r.Dia <= lastDay)
+        : filteredData.filter(r => r.Ano_Mes === prevKey);
+      momVar = calcVariation(
+        sumValues(filteredData.filter(r => r.Ano_Mes === latestKey)),
+        sumValues(prevRecs)
+      );
+    }
 
-    // YoY
+    // YoY — mesmo mês ano anterior, cortado no mesmo dia se incompleto
+    const { ano } = periodoInfo;
+    const prevYearRecs = isIncomplete
+      ? rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes && r.Dia <= lastDay)
+      : rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes);
+    const curMonthRecs = filteredData.filter(r => r.Ano_Mes === latestKey);
+    const yoyVar = calcVariation(sumValues(curMonthRecs), sumValues(prevYearRecs));
+
+    // YoY anual (ano cheio vs ano cheio) — para o KPI Crescimento YoY
     const allYears = [...new Set(rawData.map(r => r.Ano))].sort();
-    const yoyVar = calcVariation(
-      sumValues(rawData.filter(r => r.Ano === allYears[allYears.length - 1])),
-      sumValues(rawData.filter(r => r.Ano === allYears[allYears.length - 2]))
+    const curYear  = allYears[allYears.length - 1];
+    const yoyAnual = calcVariation(
+      sumValues(rawData.filter(r => r.Ano === curYear)),
+      sumValues(rawData.filter(r => r.Ano === curYear - 1))
     );
 
     return {
-      total, casa, del, momVar, yoyVar, curKey,
+      total, casa, del, momVar, yoyVar, yoyAnual,
       pctCasa: total > 0 ? (casa / total * 100) : 0,
       pctDel:  total > 0 ? (del  / total * 100) : 0,
     };
-  }, [filteredData, rawData]);
+  }, [filteredData, rawData, periodoInfo]);
 
-  // ── YoY card: current month vs same month last year (adjusted to same day) ──
+  // ── Card YoY — mês atual vs mesmo mês ano anterior ─────────────
   const yoyCard = useMemo(() => {
-    const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
-    const curKey = allMonths[allMonths.length - 1];
-    if (!curKey) return null;
+    if (!periodoInfo) return null;
+    const { ano, mes, lastDay, isIncomplete, label } = periodoInfo;
+    const latestKey = periodoInfo.latestKey;
 
-    const [curYearStr, curMesStr] = curKey.split('-');
-    const curYear = Number(curYearStr);
-    const curMes  = Number(curMesStr);
-
-    // Latest day in current month
-    const curMonthRecs = rawData.filter(r => r.Ano_Mes === curKey);
-    if (!curMonthRecs.length) return null;
-    const lastDay = Math.max(...curMonthRecs.map(r => r.Dia));
-
-    // Same month previous year, cut to same day
-    const prevYear = curYear - 1;
-    const prevMonthRecs = rawData.filter(r =>
-      r.Ano === prevYear && r.Mes === curMes && r.Dia <= lastDay
+    const curTotal  = sumValues(filteredData.filter(r => r.Ano_Mes === latestKey));
+    const prevRecs  = rawData.filter(r =>
+      r.Ano === ano - 1 && r.Mes === mes &&
+      (!isIncomplete || r.Dia <= lastDay)
     );
-
-    const curTotal  = sumValues(curMonthRecs);
-    const prevTotal = sumValues(prevMonthRecs);
+    const prevTotal = sumValues(prevRecs);
     const variation = calcVariation(curTotal, prevTotal);
+    const pct       = prevTotal > 0 ? (curTotal / prevTotal * 100) : null;
 
-    const mesLabel = curMonthRecs[0]?.Mes_Nome || '';
+    const mesPrevLabel = rawData.find(r => r.Ano === ano - 1 && r.Mes === mes)?.Ano_Mes_Label
+      || `${label.split('/')[0]}/${String(ano - 1).slice(2)}`;
 
     return {
-      curLabel:  `${mesLabel}/${String(curYear).slice(2)}`,
-      prevLabel: `${mesLabel}/${String(prevYear).slice(2)}`,
-      curTotal, prevTotal, variation,
-      lastDay,
-      pct: prevTotal > 0 ? (curTotal / prevTotal * 100) : null,
+      curLabel: label,
+      prevLabel: mesPrevLabel,
+      curTotal, prevTotal, variation, pct,
+      lastDay, isIncomplete,
     };
-  }, [rawData]);
+  }, [filteredData, rawData, periodoInfo]);
 
-  // ── Last 4 months trend strip ─────────────────────────────────
+  // ── Faixa de tendência — últimos 4 meses ───────────────────────
   const trendStrip = useMemo(() => {
     const monthly = getMonthlyTotals(filteredData);
-    const last4   = monthly.slice(-4);
-    return last4.map((m, i, arr) => {
+    return monthly.slice(-4).map((m, i, arr) => {
       const prev = arr[i - 1];
-      const mom  = prev ? calcVariation(m.total, prev.total) : null;
-      // YoY for this month
-      const sameMonthPrevYear = rawData.filter(r => r.Ano === m.ano - 1 && r.Mes === m.mes);
-      const yoy = calcVariation(m.total, sumValues(sameMonthPrevYear));
-      return { ...m, mom, yoy };
-    });
-  }, [filteredData, rawData]);
+      const isLast = i === arr.length - 1;
 
-  // ── Meta do mês atual ─────────────────────────────────────────
+      // MoM — se último mês incompleto, corta anterior no mesmo dia
+      let momVar = null;
+      if (prev) {
+        const curVal = m.total;
+        const prevVal = (isLast && periodoInfo?.isIncomplete)
+          ? sumValues(filteredData.filter(r => r.Ano_Mes === prev.key && r.Dia <= periodoInfo.lastDay))
+          : prev.total;
+        momVar = calcVariation(curVal, prevVal);
+      }
+
+      // YoY — mesmo mês ano anterior, mesmo corte de dia
+      const prevYearRecs = rawData.filter(r =>
+        r.Ano === m.ano - 1 && r.Mes === m.mes &&
+        (!( isLast && periodoInfo?.isIncomplete) || r.Dia <= periodoInfo?.lastDay)
+      );
+      const yoy = calcVariation(m.total, sumValues(prevYearRecs));
+
+      return { ...m, mom: momVar, yoy, isLast };
+    });
+  }, [filteredData, rawData, periodoInfo]);
+
+  // ── Meta ───────────────────────────────────────────────────────
   const metaMesAtual = useMemo(() => {
-    const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
-    const key = allMonths[allMonths.length - 1];
-    if (!key) return null;
-    const meta = getMetaTotal(key, lojas);
+    if (!periodoInfo) return null;
+    const meta = getMetaTotal(periodoInfo.latestKey, lojas);
     if (!meta) return null;
-    const real  = sumValues(rawData.filter(r => r.Ano_Mes === key));
-    const label = rawData.find(r => r.Ano_Mes === key)?.Ano_Mes_Label || key;
-    return { meta, real, label };
-  }, [stats.curKey, lojas, getMetaTotal, rawData]);
+    const real = sumValues(filteredData.filter(r => r.Ano_Mes === periodoInfo.latestKey));
+    return { meta, real, label: periodoInfo.label };
+  }, [periodoInfo, lojas, getMetaTotal, filteredData]);
 
   const monthlyData = useMemo(() => getMonthlyTotals(filteredData).slice(-18), [filteredData]);
   const dowData     = useMemo(() => getDOWTotals(filteredData), [filteredData]);
   const pieData = [
-    { name: 'Casa',     value: stats.casa },
-    { name: 'Delivery', value: stats.del  },
+    { name: 'Casa',     value: stats?.casa  || 0 },
+    { name: 'Delivery', value: stats?.del   || 0 },
   ];
+
+  if (!stats) return null;
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
 
-      {/* ── KPI grid ── */}
+      {/* Aviso de corte quando mês incompleto */}
+      {periodoInfo?.isIncomplete && (
+        <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+          <Calendar size={13} className="flex-shrink-0" />
+          <span>
+            <strong>{periodoInfo.label}</strong> está incompleto — comparações MoM e YoY cortadas no dia <strong>{periodoInfo.lastDay}</strong> para uma análise justa.
+          </span>
+        </div>
+      )}
+
+      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard title="Faturamento Total" value={stats.total} icon={DollarSign} accent="#97A624"
-          variation={stats.momVar} variationLabel="vs mês anterior" delay={0} />
+          variation={stats.momVar} variationLabel={periodoInfo?.isIncomplete ? `vs mês ant. (até dia ${periodoInfo.lastDay})` : 'vs mês anterior'} delay={0} />
         <KpiCard title="Casa"     value={stats.casa} icon={Home}  accent="#8C1414"
           subtitle={`${formatPercentPlain(stats.pctCasa)} do total`} delay={80} />
         <KpiCard title="Delivery" value={stats.del}  icon={Truck} accent="#D9B504"
           subtitle={`${formatPercentPlain(stats.pctDel)} do total`} delay={160} />
-        <KpiCard title="Crescimento YoY" value={stats.yoyVar} format="percent"
+        <KpiCard title="vs Mesmo Mês Ano Ant." value={stats.yoyVar} format="percent"
           icon={TrendingUp} accent="#97A624"
-          variation={stats.yoyVar} variationLabel="ano corrente vs anterior" delay={240} />
+          variation={stats.yoyVar}
+          variationLabel={periodoInfo?.isIncomplete ? `até dia ${periodoInfo.lastDay}` : 'mesmo mês ano anterior'}
+          delay={240} />
       </div>
 
-      {/* ── YoY card + Tendência strip ── */}
+      {/* YoY card + Tendência */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {/* YoY card — mês atual vs mesmo mês ano anterior */}
         {yoyCard && (
           <div className="bg-white border border-surface-border rounded-2xl p-5 animate-slide-up"
             style={{ animationDelay: '100ms', animationFillMode: 'both' }}>
@@ -171,32 +224,32 @@ export default function Overview() {
                 Mês Atual vs Ano Anterior
               </span>
             </div>
-
-            {/* Current month */}
             <div className="mb-3">
-              <p className="text-xs text-zinc-400 mb-1">{yoyCard.curLabel} <span className="text-zinc-300">(até dia {yoyCard.lastDay})</span></p>
+              <p className="text-xs text-zinc-400 mb-1">
+                {yoyCard.curLabel}
+                {yoyCard.isIncomplete && (
+                  <span className="ml-1.5 text-amber-600">(até dia {yoyCard.lastDay})</span>
+                )}
+              </p>
               <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(yoyCard.curTotal, true)}</p>
             </div>
-
-            {/* Progress bar vs prev year */}
             {yoyCard.pct !== null && (
               <div className="mb-3">
                 <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
+                  <div className="h-full rounded-full transition-all duration-700"
                     style={{
                       width: `${Math.min(yoyCard.pct, 100)}%`,
                       backgroundColor: yoyCard.pct >= 100 ? '#059669' : yoyCard.pct >= 80 ? '#D97706' : '#97A624'
-                    }}
-                  />
+                    }} />
                 </div>
               </div>
             )}
-
-            {/* Previous year */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">{yoyCard.prevLabel} (mesmo período)</p>
+                <p className="text-xs text-zinc-400">
+                  {yoyCard.prevLabel}
+                  {yoyCard.isIncomplete && ` (até dia ${yoyCard.lastDay})`}
+                </p>
                 <p className="text-sm font-semibold text-zinc-500">{formatBRL(yoyCard.prevTotal, true)}</p>
               </div>
               {yoyCard.variation !== null && (
@@ -212,10 +265,8 @@ export default function Overview() {
         )}
 
         {/* Tendência — últimos 4 meses */}
-        <div
-          className="lg:col-span-2 bg-white border border-surface-border rounded-2xl p-5 animate-slide-up"
-          style={{ animationDelay: '150ms', animationFillMode: 'both' }}
-        >
+        <div className="lg:col-span-2 bg-white border border-surface-border rounded-2xl p-5 animate-slide-up"
+          style={{ animationDelay: '150ms', animationFillMode: 'both' }}>
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp size={14} className="text-zinc-400" />
             <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
@@ -223,39 +274,37 @@ export default function Overview() {
             </span>
           </div>
           <div className="grid grid-cols-4 gap-3">
-            {trendStrip.map((m, i) => {
-              const momColor  = m.mom  === null ? '#A1A1AA' : m.mom  >= 0 ? '#059669' : '#dc2626';
-              const yoyColor  = m.yoy  === null ? '#A1A1AA' : m.yoy  >= 0 ? '#059669' : '#dc2626';
-              const isLatest  = i === trendStrip.length - 1;
+            {trendStrip.map((m) => {
+              const momColor = m.mom === null ? '#A1A1AA' : m.mom >= 0 ? '#059669' : '#dc2626';
+              const yoyColor = m.yoy === null ? '#A1A1AA' : m.yoy >= 0 ? '#059669' : '#dc2626';
               return (
-                <div
-                  key={m.key}
-                  className={`rounded-xl p-3 transition-all ${
-                    isLatest ? 'bg-brand-black text-white' : 'bg-surface-muted'
-                  }`}
-                >
-                  <p className={`text-xs font-semibold mb-2 ${isLatest ? 'text-zinc-400' : 'text-zinc-400'}`}>
+                <div key={m.key} className={`rounded-xl p-3 transition-all ${
+                  m.isLast ? 'bg-brand-black text-white' : 'bg-surface-muted'
+                }`}>
+                  <p className="text-xs font-semibold text-zinc-400 mb-2">
                     {m.label}
-                    {isLatest && <span className="ml-1 text-[10px] text-amber-400">atual</span>}
+                    {m.isLast && periodoInfo?.isIncomplete && (
+                      <span className="ml-1 text-[10px] text-amber-400">dia {periodoInfo.lastDay}</span>
+                    )}
                   </p>
-                  <p className={`text-base font-bold font-display mb-3 ${isLatest ? 'text-white' : 'text-brand-black'}`}>
+                  <p className={`text-base font-bold font-display mb-3 ${m.isLast ? 'text-white' : 'text-brand-black'}`}>
                     {formatBRL(m.total, true)}
                   </p>
                   <div className="space-y-1.5">
-                    {/* MoM */}
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`text-[10px] ${isLatest ? 'text-zinc-500' : 'text-zinc-400'}`}>MoM</span>
+                      <span className={`text-[10px] ${m.isLast ? 'text-zinc-500' : 'text-zinc-400'}`}>MoM</span>
                       {m.mom !== null ? (
-                        <span className="text-[11px] font-semibold" style={{ color: isLatest ? (m.mom >= 0 ? '#86efac' : '#fca5a5') : momColor }}>
+                        <span className="text-[11px] font-semibold"
+                          style={{ color: m.isLast ? (m.mom >= 0 ? '#86efac' : '#fca5a5') : momColor }}>
                           {m.mom >= 0 ? '▲' : '▼'} {Math.abs(m.mom).toFixed(1).replace('.', ',')}%
                         </span>
                       ) : <span className="text-[10px] text-zinc-300">—</span>}
                     </div>
-                    {/* YoY */}
                     <div className="flex items-center justify-between gap-1">
-                      <span className={`text-[10px] ${isLatest ? 'text-zinc-500' : 'text-zinc-400'}`}>YoY</span>
+                      <span className={`text-[10px] ${m.isLast ? 'text-zinc-500' : 'text-zinc-400'}`}>YoY</span>
                       {m.yoy !== null ? (
-                        <span className="text-[11px] font-semibold" style={{ color: isLatest ? (m.yoy >= 0 ? '#86efac' : '#fca5a5') : yoyColor }}>
+                        <span className="text-[11px] font-semibold"
+                          style={{ color: m.isLast ? (m.yoy >= 0 ? '#86efac' : '#fca5a5') : yoyColor }}>
                           {m.yoy >= 0 ? '▲' : '▼'} {Math.abs(m.yoy).toFixed(1).replace('.', ',')}%
                         </span>
                       ) : <span className="text-[10px] text-zinc-300">—</span>}
@@ -268,7 +317,7 @@ export default function Overview() {
         </div>
       </div>
 
-      {/* ── Meta do mês atual ── */}
+      {/* Meta */}
       {metaMesAtual && (
         <BigProgressBar
           label={`Meta — ${metaMesAtual.label}`}
@@ -279,7 +328,7 @@ export default function Overview() {
         />
       )}
 
-      {/* ── Monthly area chart ── */}
+      {/* Gráfico mensal */}
       <div className="chart-card animate-slide-up" style={{ animationDelay: '120ms', animationFillMode: 'both' }}>
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -317,7 +366,7 @@ export default function Overview() {
         </ResponsiveContainer>
       </div>
 
-      {/* ── Bottom row ── */}
+      {/* Dia da semana + Mix */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="chart-card lg:col-span-2 animate-slide-up" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
           <h3 className="section-title mb-1">Por Dia da Semana</h3>
