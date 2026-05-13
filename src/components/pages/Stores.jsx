@@ -1,9 +1,11 @@
 // src/components/pages/Stores.jsx
 import { useMemo } from 'react';
 import {
-  ComposedChart, LineChart, Line, BarChart, Bar, AreaChart, Area,
+  BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, ReferenceLine, Cell, LabelList, PieChart, Pie
+  Legend, Cell, LabelList,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  PieChart, Pie
 } from 'recharts';
 import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
