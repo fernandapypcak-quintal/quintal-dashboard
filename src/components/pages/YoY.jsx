@@ -10,6 +10,7 @@ import { useFilters } from '../../hooks/useFilters';
 import { CustomTooltip } from '../ui/ChartTooltip';
 import { sumValues, formatBRL, formatPercentPlain, calcVariation, formatPercent } from '../../utils/formatters';
 import { TrendingUp, TrendingDown, Info, Scissors } from 'lucide-react';
+import InfoTip from '../ui/InfoTip';
 
 const YEAR_COLORS = ['#0D0D0D', '#97A624', '#D9B504', '#8C1414'];
 const MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -292,7 +293,7 @@ export default function YoY() {
 
       {/* Annual bar comparison */}
       <div className="chart-card">
-        <h3 className="section-title mb-1">Faturamento Anual — Casa vs Delivery</h3>
+        <div className="flex items-center gap-1 mb-1"><h3 className="section-title">Faturamento Anual — Casa vs Delivery</h3><InfoTip text="Faturamento total por ano dividido entre Casa e Delivery. Com ajuste ativo, todos os anos são cortados no mesmo período para comparação justa." /></div>
         <p className="text-xs text-zinc-400 mb-5">
           {adjusted && cutoff
             ? `Todos os anos cortados no mesmo período — ${partialLabel}`
@@ -318,7 +319,7 @@ export default function YoY() {
 
       {/* Table */}
       <div className="chart-card overflow-x-auto">
-        <h3 className="section-title mb-4">Resumo Anual</h3>
+        <div className="flex items-center gap-1 mb-4"><h3 className="section-title">Resumo Anual</h3><InfoTip text="YoY completo = ano inteiro vs ano inteiro. YoY ajustado = mesmo período entre os anos (cortado na data atual)." /></div>
         <table className="w-full min-w-[580px]">
           <thead>
             <tr className="border-b border-surface-border">

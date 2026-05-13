@@ -8,6 +8,7 @@ import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
 import { sumValues, formatBRL, calcVariation, formatPercent } from '../../utils/formatters';
 import { Calendar, TrendingUp, TrendingDown } from 'lucide-react';
+import InfoTip from '../ui/InfoTip';
 
 const BRLk = v => v >= 1e6 ? 'R$\u00a0'+(v/1e6).toFixed(1).replace('.',',')+'M'
                 : v >= 1e3 ? 'R$\u00a0'+(v/1e3).toFixed(0)+'k'
@@ -171,7 +172,7 @@ export default function Weekly() {
       <div className="chart-card">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <div>
-            <h3 className="section-title">Semanas de {periodo.label}</h3>
+            <div className="flex items-center gap-1"><h3 className="section-title">Semanas de {periodo.label}</h3><InfoTip text="Cada semana do mês dividida em S1, S2, S3... Compara o faturamento desta semana com a mesma semana do ano anterior no mesmo mês." /></div>
             <p className="text-xs text-zinc-400 mt-0.5">
               Colunas = {periodo.ano} · Linha tracejada = mesmo período {periodo.ano - 1}
             </p>

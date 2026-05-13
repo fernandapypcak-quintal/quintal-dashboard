@@ -10,6 +10,7 @@ import { useMetas } from '../../hooks/useMetas';
 import { useLabels } from '../../hooks/useLabels';
 import { progressColor, AtingBadge } from '../ui/GoalProgress';
 import { sumValues, getMonthlyTotals, formatBRL, calcVariation } from '../../utils/formatters';
+import InfoTip from '../ui/InfoTip';
 
 const STORE_COLORS = ['#97A624','#D9B504','#D9CB04','#8C1414','#0D9488','#7C3AED','#EA580C','#0284C7','#65A30D','#6B7280'];
 const BRLk = v => v >= 1e6 ? 'R$\u00a0'+(v/1e6).toFixed(1).replace('.',',')+'M'
@@ -87,10 +88,12 @@ export default function Stores() {
       }).filter(d => d.media > 0);
       const melhorDia = [...dowStats].sort((a, b) => b.media - a.media)[0];
 
-      // Evolução mensal (últimos 6 meses)
-      const monthly = getMonthlyTotals(rawData.filter(r => r.Loja === loja)).slice(-6).map(m => {
+      // Evolução mensal — só o ano atual (sem misturar anos)
+      const monthly = getMonthlyTotals(
+        rawData.filter(r => r.Loja === loja && r.Ano === ano)
+      ).map(m => {
         const prevRecs = rawData.filter(r =>
-          r.Ano === m.ano - 1 && r.Mes === m.mes && r.Loja === loja
+          r.Ano === ano - 1 && r.Mes === m.mes && r.Loja === loja
         );
         return { ...m, prevYear: prevRecs.length > 0 ? sumValues(prevRecs) : null };
       });
@@ -149,7 +152,7 @@ export default function Stores() {
                   <div className="flex items-center gap-6 flex-wrap text-sm">
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5">YoY (dia {periodo.lastDay})</p>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>YoY (dia {periodo.lastDay})<InfoTip text="Variação % do faturamento atual vs mesmo período do ano anterior, cortado no mesmo dia para comparação justa." /></></p>
                       {l.yoy !== null
                         ? <p className={`font-bold ${l.yoy >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {l.yoy >= 0 ? '▲ +' : '▼ '}{Math.abs(l.yoy).toFixed(1).replace('.', ',')}%
@@ -159,12 +162,12 @@ export default function Stores() {
                     </div>
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5">Tend Fat</p>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>Tend Fat<InfoTip text="Tendência de Faturamento: projeção do mês cheio baseada na média diária atual × dias do mês." /></></p>
                       <p className="font-semibold text-zinc-700">{formatBRL(l.tendFat, true)}</p>
                     </div>
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5">Tend vs AA</p>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>Tend vs AA<InfoTip text="Tendência vs Ano Anterior: variação entre a projeção (Tend Fat) e o mesmo mês completo do ano passado." /></></p>
                       {l.tendVsAA !== null
                         ? <p className={`font-bold ${l.tendVsAA >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {l.tendVsAA >= 0 ? '▲ +' : '▼ '}{Math.abs(l.tendVsAA).toFixed(1).replace('.', ',')}%
@@ -190,7 +193,7 @@ export default function Stores() {
                     )}
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5">Share</p>
+                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>Share<InfoTip text="% que esta loja representa no faturamento total do período." /></></p>
                       <p className="font-semibold text-zinc-600">{l.share.toFixed(1)}%</p>
                     </div>
 
@@ -342,7 +345,7 @@ export default function Stores() {
               <th className="table-header text-right py-2 px-3">Realizado</th>
               <th className="table-header text-right py-2 px-3">YoY (dia {periodo.lastDay})</th>
               <th className="table-header text-right py-2 px-3">Meta</th>
-              <th className="table-header text-right py-2 px-3">% Ating.</th>
+              <th className="table-header text-right py-2 px-3"><>% Ating.<InfoTip text="% da meta atingida até agora. Vermelho = abaixo de 80%, Amarelo = 80-99%, Verde = 100%+." /></></th>
               <th className="table-header text-right py-2 px-3">Tend Fat</th>
               <th className="table-header text-right py-2 px-3">Tend vs AA</th>
               <th className="table-header text-right py-2 pl-3">Share</th>

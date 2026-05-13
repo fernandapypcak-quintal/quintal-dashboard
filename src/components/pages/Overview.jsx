@@ -11,6 +11,7 @@ import { useLabels } from '../../hooks/useLabels';
 import KpiCard from '../ui/KpiCard';
 import { BigProgressBar } from '../ui/GoalProgress';
 import { CustomTooltip } from '../ui/ChartTooltip';
+import InfoTip from '../ui/InfoTip';
 import {
   sumValues, getMonthlyTotals, getDOWTotals, calcVariation,
   formatBRL, formatPercentPlain, formatPercent
@@ -200,6 +201,7 @@ export default function Overview() {
           value={stats.total}
           icon={DollarSign}
           accent="#97A624"
+          tooltip="Soma do faturamento no período filtrado. A variação YoY compara com o mesmo mês do ano anterior, cortada no mesmo dia para análise justa."
           variation={stats.yoyMes}
           variationLabel={periodo.isIncomplete ? `YoY até dia ${periodo.lastDay}` : 'vs mesmo mês ano ant.'}
           delay={0}
@@ -209,6 +211,7 @@ export default function Overview() {
           value={stats.casa}
           icon={Home}
           accent="#8C1414"
+          tooltip="Faturamento gerado pelo canal CASA (consumo no local) no período filtrado."
           subtitle={`${formatPercentPlain(stats.pctCasa)} do total`}
           delay={80}
         />
@@ -217,6 +220,7 @@ export default function Overview() {
           value={stats.del}
           icon={Truck}
           accent="#D9B504"
+          tooltip="Faturamento gerado pelo canal DELIVERY no período filtrado."
           subtitle={`${formatPercentPlain(stats.pctDel)} do total`}
           delay={160}
         />
@@ -225,6 +229,7 @@ export default function Overview() {
           value={stats.projetado}
           icon={Target}
           accent="#97A624"
+          tooltip="Tend Fat: média diária × dias do mês. Mostra como o mês deve fechar mantendo o ritmo atual. Tend vs AA = variação vs mesmo mês do ano passado (completo)."
           variation={stats.tendVsAA}
           variationLabel={`vs ${periodo.label.split('/')[0]}/${String(periodo.ano - 1).slice(2)}`}
           delay={240}
@@ -259,14 +264,14 @@ export default function Overview() {
           <div className="grid grid-cols-3 gap-3">
             {/* Dias restantes */}
             <div className="bg-surface-muted rounded-xl p-4">
-              <p className="text-xs text-zinc-400 mb-2">Dias restantes</p>
+              <div className="flex items-center gap-1 mb-2"><p className="text-xs text-zinc-400">Dias restantes</p><InfoTip text="Dias que faltam até o fim do mês, contando a partir do último dia com dados registrados." /></div>
               <p className="text-2xl font-bold font-display text-brand-black">{contexto.diasRestantes}</p>
               <p className="text-xs text-zinc-400 mt-1">até o fim do mês</p>
             </div>
 
             {/* Necessário por dia para meta */}
             <div className="bg-surface-muted rounded-xl p-4">
-              <p className="text-xs text-zinc-400 mb-2">Necessário p/ meta</p>
+              <div className="flex items-center gap-1 mb-2"><p className="text-xs text-zinc-400">Necessário p/ meta</p><InfoTip text="Quanto precisa faturar por dia para atingir a meta. Cálculo: (Meta - Realizado) ÷ Dias restantes. Comparado com o ritmo diário atual." /></div>
               {contexto.necessarioPorDia !== null ? (
                 <>
                   <p className="text-xl font-bold font-display text-brand-black">
@@ -289,7 +294,7 @@ export default function Overview() {
 
             {/* Melhor dia da semana */}
             <div className="bg-surface-muted rounded-xl p-4">
-              <p className="text-xs text-zinc-400 mb-2">Melhor dia do mês</p>
+              <div className="flex items-center gap-1 mb-2"><p className="text-xs text-zinc-400">Melhor dia do mês</p><InfoTip text="Dia da semana com maior média de faturamento no mês atual. Mostra em qual dia a operação performa melhor." /></div>
               {contexto.melhorDia ? (
                 <>
                   <p className="text-xl font-bold font-display text-brand-black">
