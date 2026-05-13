@@ -10,13 +10,12 @@ import Trend from './components/pages/Trend';
 import YoY from './components/pages/YoY';
 import Weekly from './components/pages/Weekly';
 import Stores from './components/pages/Stores';
-import Metas from './components/pages/Metas';
 import History from './components/pages/History';
 import LoadingScreen, { ErrorScreen } from './components/ui/LoadingScreen';
 
 const PAGES = {
   overview: Overview, trend: Trend, yoy: YoY,
-  weekly: Weekly, stores: Stores, metas: Metas, history: History,
+  weekly: Weekly, stores: Stores, history: History,
 };
 
 function Dashboard() {
