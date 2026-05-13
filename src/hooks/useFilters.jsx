@@ -12,14 +12,16 @@ const MESES = [
 ];
 
 export function FilterProvider({ children }) {
-  const [rawData, setRawData]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState(null);
-  const [filters, setFilters]   = useState({
-    loja:  'Todas',
+  const [rawData, setRawData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+
+  // Filters — lojas and meses are Sets (empty = "all")
+  const [filters, setFilters] = useState({
+    lojas: new Set(),   // Set<string> — empty = todas
+    meses: new Set(),   // Set<number> — empty = todos
     canal: 'Todos',
     ano:   'Todos',
-    mes:   'Todos',
   });
 
   useEffect(() => {
@@ -35,11 +37,12 @@ export function FilterProvider({ children }) {
   }, [rawData]);
 
   const filteredData = useMemo(() => {
+    const { lojas, meses, canal, ano } = filters;
     return rawData.filter(r => {
-      if (filters.loja  !== 'Todas' && r.Loja  !== filters.loja)           return false;
-      if (filters.canal !== 'Todos' && r.Canal !== filters.canal)           return false;
-      if (filters.ano   !== 'Todos' && r.Ano   !== Number(filters.ano))    return false;
-      if (filters.mes   !== 'Todos' && r.Mes   !== Number(filters.mes))    return false;
+      if (lojas.size > 0 && !lojas.has(r.Loja))           return false;
+      if (meses.size > 0 && !meses.has(r.Mes))             return false;
+      if (canal !== 'Todos' && r.Canal !== canal)           return false;
+      if (ano   !== 'Todos' && r.Ano   !== Number(ano))     return false;
       return true;
     });
   }, [rawData, filters]);
@@ -48,12 +51,18 @@ export function FilterProvider({ children }) {
     setFilters(prev => ({ ...prev, [key]: value }));
 
   const resetFilters = () =>
-    setFilters({ loja: 'Todas', canal: 'Todos', ano: 'Todos', mes: 'Todos' });
+    setFilters({ lojas: new Set(), meses: new Set(), canal: 'Todos', ano: 'Todos' });
+
+  const hasActiveFilters =
+    filters.lojas.size > 0 ||
+    filters.meses.size > 0 ||
+    filters.canal !== 'Todos' ||
+    filters.ano   !== 'Todos';
 
   return (
     <FilterContext.Provider value={{
       filters, filteredData, meta, updateFilter, resetFilters,
-      rawData, loading, error,
+      rawData, loading, error, hasActiveFilters,
     }}>
       {children}
     </FilterContext.Provider>
