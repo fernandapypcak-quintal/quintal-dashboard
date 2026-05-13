@@ -131,26 +131,35 @@ export default function Overview() {
     };
   }, [periodo, stats, filteredData, rawData, lojas, getMetaTotal]);
 
-  // ── Gráfico: barras mensais + linha ano anterior ───────────────
+  // ── Gráfico: barras do ano atual + linha do ano anterior ────────
+  // Mostra APENAS o ano atual (ou o filtrado), com linha do mesmo
+  // período no ano anterior — sem misturar os dois anos nas barras.
   const chartData = useMemo(() => {
     if (!periodo) return [];
-    const monthly = getMonthlyTotals(filteredData).slice(-18);
-    return monthly.map(m => {
-      // Só mostra linha do ano anterior se existirem dados reais
-      const prevYearRecs = rawData.filter(r => r.Ano === m.ano - 1 && r.Mes === m.mes);
-      const hasPrevData  = prevYearRecs.length > 0;
-      const prevYearValue = !hasPrevData
+
+    // Determina qual ano mostrar nas barras
+    // Se filtro de ano ativo: usa esse ano. Senão: ano mais recente com dados.
+    const anos = [...new Set(filteredData.map(r => r.Ano))].sort();
+    const anoAtual = anos[anos.length - 1];
+    const anoAnt   = anoAtual - 1;
+
+    // Meses do ano atual presentes nos dados filtrados
+    const mesesAnoAtual = getMonthlyTotals(
+      filteredData.filter(r => r.Ano === anoAtual)
+    );
+
+    return mesesAnoAtual.map(m => {
+      // Mesmo mês no ano anterior (com corte se incompleto)
+      const prevRecs = rawData.filter(r => r.Ano === anoAnt && r.Mes === m.mes);
+      const hasPrev  = prevRecs.length > 0;
+      const prevValue = !hasPrev
         ? null
         : (periodo.isIncomplete && m.key === periodo.latestKey)
           ? sumValues(rawData.filter(r =>
-              r.Ano === m.ano - 1 && r.Mes === m.mes && r.Dia <= periodo.lastDay
+              r.Ano === anoAnt && r.Mes === m.mes && r.Dia <= periodo.lastDay
             ))
-          : sumValues(prevYearRecs);
-      return {
-        ...m,
-        prevYear: prevYearValue,
-        prevYearLabel: `${m.mes_nome || m.label.split('/')[0]}/${String(m.ano - 1).slice(2)}`,
-      };
+          : sumValues(prevRecs);
+      return { ...m, prevYear: prevValue };
     });
   }, [filteredData, rawData, periodo]);
 
