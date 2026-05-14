@@ -70,7 +70,9 @@ export default function Stores() {
       const ating = meta > 0 ? realAtual / meta * 100 : null;
 
       // Tend Fat
-      const mediaDiaria = lastDay > 0 ? realAtual / lastDay : 0;
+      // Usa dias com faturamento real (exclui dias sem registro)
+      const diasComDados = new Set(recsCur.map(r => r.Data)).size;
+      const mediaDiaria = diasComDados > 0 ? realAtual / diasComDados : 0;
       const tendFat     = mediaDiaria * totalDays;
       const prevAAfull  = sumValues(rawData.filter(r =>
         r.Ano === ano - 1 && r.Mes === mes && r.Loja === loja
