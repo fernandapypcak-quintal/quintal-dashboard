@@ -17,11 +17,14 @@ export function FilterProvider({ children }) {
   const [error, setError]     = useState(null);
 
   // Filters — lojas and meses are Sets (empty = "all")
+  // Default: ano atual + mês mais recente com dados
+  // Após carregar os dados, ajusta para o último mês disponível
+  const now = new Date();
   const [filters, setFilters] = useState({
-    lojas: new Set(),   // Set<string> — empty = todas
-    meses: new Set(),   // Set<number> — empty = todos
+    lojas: new Set(),
+    meses: new Set([now.getMonth() + 1]),  // mês atual
     canal: 'Todos',
-    ano:   'Todos',
+    ano:   String(now.getFullYear()),      // ano atual
   });
 
   useEffect(() => {
@@ -50,8 +53,10 @@ export function FilterProvider({ children }) {
   const updateFilter = (key, value) =>
     setFilters(prev => ({ ...prev, [key]: value }));
 
-  const resetFilters = () =>
-    setFilters({ lojas: new Set(), meses: new Set(), canal: 'Todos', ano: 'Todos' });
+  const resetFilters = () => {
+    const n = new Date();
+    setFilters({ lojas: new Set(), meses: new Set([n.getMonth()+1]), canal: 'Todos', ano: String(n.getFullYear()) });
+  };
 
   const hasActiveFilters =
     filters.lojas.size > 0 ||
