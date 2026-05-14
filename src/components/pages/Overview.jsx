@@ -43,6 +43,34 @@ function daysInMonth(year, month) {
 
 const DOW_LABELS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 
+
+// ── Tend Fat: realizado + projeção dias restantes por dia da semana ──────
+function calcTendFat(recsAtual, lastDay, totalDays, ano, mes) {
+  if (!recsAtual.length) return 0;
+  
+  // Média por dia da semana baseada nos dias já realizados
+  const mediaPorDow = {};
+  for (let dow = 0; dow < 7; dow++) {
+    const recsDow = recsAtual.filter(r => r.Dia_Semana_Num === dow);
+    const diasDow  = new Set(recsDow.map(r => r.Data)).size;
+    mediaPorDow[dow] = diasDow > 0
+      ? recsDow.reduce((s, r) => s + r.Valor, 0) / diasDow
+      : 0;
+  }
+  
+  // Projeção dos dias restantes (lastDay+1 até totalDays)
+  let projecaoRestante = 0;
+  for (let dia = lastDay + 1; dia <= totalDays; dia++) {
+    const dow = new Date(ano, mes - 1, dia).getDay(); // 0=Dom, 1=Seg...
+    // Converte: JS usa 0=Dom, mas nossos dados usam 0=Seg
+    const dowNosso = dow === 0 ? 6 : dow - 1;
+    projecaoRestante += mediaPorDow[dowNosso] || 0;
+  }
+  
+  const realizado = recsAtual.reduce((s, r) => s + r.Valor, 0);
+  return realizado + projecaoRestante;
+}
+
 export default function Overview() {
   const { filteredData, rawData } = useFilters();
   const { getMetaTotal } = useMetas();
@@ -87,10 +115,9 @@ export default function Overview() {
     const realizado   = sumValues(curMonthRecs);
     // Dias com faturamento real (exclui dias sem registro)
     // Usa dias fechados (exclui o dia atual, que pode estar incompleto)
-    // Último dia = dia fechado (dados sempre do dia anterior)
-    const diasComDados = new Set(curMonthRecs.map(r => r.Data)).size;
-    const mediaDiaria  = diasComDados > 0 ? realizado / diasComDados : 0;
-    const projetado   = mediaDiaria * periodo.totalDays;
+    // Tend Fat = realizado + projeção dos dias restantes por dia da semana
+    const projetado = calcTendFat(curMonthRecs, lastDay, periodo.totalDays, ano, mes);
+    const mediaDiaria = lastDay > 0 ? realizado / lastDay : 0; // só para exibição
     const prevMesAno  = sumValues(rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes));
     const tendVsAA    = calcVariation(projetado, prevMesAno);
 
