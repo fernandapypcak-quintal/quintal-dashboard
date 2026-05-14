@@ -51,14 +51,14 @@ export default function Overview() {
 
   // ── Período atual ──────────────────────────────────────────────
   const periodo = useMemo(() => {
-    if (!filteredData.length) return null;
-    const meses = [...new Set(filteredData.map(r => r.Ano_Mes))].sort();
-    const latestKey = meses[meses.length - 1];
+    if (!rawData.length) return null;
+    // Sempre deriva o período do rawData para garantir que ano = ano atual
+    const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
+    const latestKey = allMonths[allMonths.length - 1];
     const [anoStr, mesStr] = latestKey.split('-');
     const ano = Number(anoStr), mes = Number(mesStr);
-    const recsLatest = filteredData.filter(r => r.Ano_Mes === latestKey);
+    const recsLatest = rawData.filter(r => r.Ano_Mes === latestKey);
     const lastDay = Math.max(...recsLatest.map(r => r.Dia));
-    const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
     const isIncomplete = latestKey === allMonths[allMonths.length - 1];
     const label = recsLatest[0]?.Ano_Mes_Label || latestKey;
     const totalDays = daysInMonth(ano, mes);
@@ -69,12 +69,14 @@ export default function Overview() {
   const stats = useMemo(() => {
     if (!periodo) return null;
     const { latestKey, ano, mes, lastDay, isIncomplete } = periodo;
-    const total = sumValues(filteredData);
-    const casa  = sumValues(filteredData.filter(r => r.Canal === 'CASA'));
-    const del   = sumValues(filteredData.filter(r => r.Canal === 'DELIVERY'));
+    // Sempre usa só o ano atual (independente do filtro de ano)
+    const anoAtualData  = filteredData.filter(r => r.Ano === ano);
+    const total = sumValues(anoAtualData);
+    const casa  = sumValues(anoAtualData.filter(r => r.Canal === 'CASA'));
+    const del   = sumValues(anoAtualData.filter(r => r.Canal === 'DELIVERY'));
 
     // YoY mês atual (com corte)
-    const curMonthRecs  = filteredData.filter(r => r.Ano_Mes === latestKey);
+    const curMonthRecs  = anoAtualData.filter(r => r.Ano_Mes === latestKey);
     const prevYearRecs  = rawData.filter(r =>
       r.Ano === ano - 1 && r.Mes === mes &&
       (!isIncomplete || r.Dia <= lastDay)
@@ -85,11 +87,9 @@ export default function Overview() {
     const realizado   = sumValues(curMonthRecs);
     // Dias com faturamento real (exclui dias sem registro)
     // Usa dias fechados (exclui o dia atual, que pode estar incompleto)
-    const todosOsDias  = [...new Set(curMonthRecs.map(r => r.Data))].sort();
-    const diasFechados = todosOsDias.slice(0, -1); // remove o último dia
-    const diaFechado   = diasFechados.length;
-    const realizadoFechado = sumValues(curMonthRecs.filter(r => diasFechados.includes(r.Data)));
-    const mediaDiaria  = diaFechado > 0 ? realizadoFechado / diaFechado : 0;
+    // Último dia = dia fechado (dados sempre do dia anterior)
+    const diasComDados = new Set(curMonthRecs.map(r => r.Data)).size;
+    const mediaDiaria  = diasComDados > 0 ? realizado / diasComDados : 0;
     const projetado   = mediaDiaria * periodo.totalDays;
     const prevMesAno  = sumValues(rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes));
     const tendVsAA    = calcVariation(projetado, prevMesAno);

@@ -70,12 +70,9 @@ export default function Stores() {
       const ating = meta > 0 ? realAtual / meta * 100 : null;
 
       // Tend Fat
-      // Usa dias fechados (exclui o dia atual, que pode estar incompleto)
-      const todosOsDiasL  = [...new Set(recsCur.map(r => r.Data))].sort();
-      const diasFechadosL = todosOsDiasL.slice(0, -1);
-      const diaFechadoL   = diasFechadosL.length;
-      const realFechado   = sumValues(recsCur.filter(r => diasFechadosL.includes(r.Data)));
-      const mediaDiaria   = diaFechadoL > 0 ? realFechado / diaFechadoL : 0;
+      // Último dia = dia fechado (dados sempre do dia anterior)
+      const diasComDados = new Set(recsCur.map(r => r.Data)).size;
+      const mediaDiaria  = diasComDados > 0 ? realAtual / diasComDados : 0;
       const tendFat     = mediaDiaria * totalDays;
       const prevAAfull  = sumValues(rawData.filter(r =>
         r.Ano === ano - 1 && r.Mes === mes && r.Loja === loja
