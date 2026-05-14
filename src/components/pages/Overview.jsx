@@ -84,8 +84,8 @@ export default function Overview() {
     // Projeção do mês
     const realizado   = sumValues(curMonthRecs);
     // Dias com faturamento real (exclui dias sem registro)
-      const diasComDados = new Set(recsCur.map(r => r.Data)).size;
-      const mediaDiaria = diasComDados > 0 ? realizado / diasComDados : 0;
+    const diasComDados = new Set(curMonthRecs.map(r => r.Data)).size;
+    const mediaDiaria = diasComDados > 0 ? realizado / diasComDados : 0;
     const projetado   = mediaDiaria * periodo.totalDays;
     const prevMesAno  = sumValues(rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes));
     const tendVsAA    = calcVariation(projetado, prevMesAno);

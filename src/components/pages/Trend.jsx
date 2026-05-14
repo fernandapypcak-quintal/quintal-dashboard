@@ -78,8 +78,8 @@ export default function Trend() {
     const recsAtual   = filteredData.filter(r => r.Ano_Mes === latestKey);
     const realizado   = sumValues(recsAtual);
     // Dias com faturamento real (exclui dias sem registro)
-      const diasComDados = new Set(recsCur.map(r => r.Data)).size;
-      const mediaDiaria = diasComDados > 0 ? realizado / diasComDados : 0;
+    const diasComDados = new Set(recsAtual.map(r => r.Data)).size;
+    const mediaDiaria = diasComDados > 0 ? realizado / diasComDados : 0;
     const projetado   = mediaDiaria * totalDays;
 
     // Mesmo mês ano anterior (mês cheio)
