@@ -69,12 +69,12 @@ function calcTendFat(recsAtual, lastDay, totalDays, ano, mes) {
   }
 
   // Projeção dos dias restantes a partir de lastDay+1
-  // (lastDay está incluído no realizado, a projeção começa em lastDay+1)
+  // CSV usa Dia_Semana_Num: 0=Dom, 1=Seg...6=Sáb (igual ao JS getDay())
+  // Não precisa converter - dow_js == dow_csv diretamente
   let projecaoRestante = 0;
   for (let dia = lastDay + 1; dia <= totalDays; dia++) {
-    const dow = new Date(ano, mes - 1, dia).getDay(); // JS: 0=Dom
-    const dowNosso = dow === 0 ? 6 : dow - 1;        // converte para 0=Seg
-    projecaoRestante += mediaPorDow[dowNosso] || 0;
+    const dow = new Date(ano, mes - 1, dia).getDay(); // 0=Dom, igual ao CSV
+    projecaoRestante += mediaPorDow[dow] || 0;
   }
 
   const realizado = recsAtual.reduce((s, r) => s + r.Valor, 0);

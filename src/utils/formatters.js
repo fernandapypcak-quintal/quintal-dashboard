@@ -120,8 +120,8 @@ export function getStoreTotals(records) {
 }
 
 export function getDOWTotals(records) {
-  // Dia_Semana_Num: 0=Seg, 1=Ter, 2=Qua, 3=Qui, 4=Sex, 5=Sáb, 6=Dom
-  const DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  // Dia_Semana_Num: 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sáb (igual JS getDay())
+  const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const grouped = groupBy(records, 'Dia_Semana_Num');
   return DAYS.map((label, num) => {
     const recs = grouped[num] || [];
