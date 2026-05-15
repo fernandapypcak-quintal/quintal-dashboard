@@ -13,7 +13,7 @@ import History from './components/pages/History';
 import LoadingScreen, { ErrorScreen } from './components/ui/LoadingScreen';
 
 const PAGES = {
-  overview: Overview, trend: Trend, yoy: YoY,
+  overview: Overview, trend: Trend,
   weekly: Weekly, stores: Stores, history: History,
 };
 
