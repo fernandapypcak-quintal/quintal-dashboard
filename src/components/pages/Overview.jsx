@@ -62,19 +62,27 @@ export default function Overview() {
   const periodo = useMemo(() => getPeriodo(rawData), [rawData]);
   const lojas   = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
+  // Aplica filtros de loja e canal (mas não de ano/mês) para comparações YoY
+  const { filters } = useFilters();
+  const baseData = useMemo(() => rawData.filter(r => {
+    if (filters.lojas.size > 0 && !filters.lojas.has(r.Loja)) return false;
+    if (filters.canal !== 'Todos' && r.Canal !== filters.canal)  return false;
+    return true;
+  }), [rawData, filters]);
+
   // ── KPIs do mês atual — sempre usando rawData filtrado por ano atual ──
   const kpis = useMemo(() => {
     if (!periodo) return null;
     const { key, ano, mes, lastDay, totalDays } = periodo;
 
     // Dados do mês atual (ano atual, mês atual)
-    const recsMes = rawData.filter(r => r.Ano === ano && r.Mes === mes);
+    const recsMes = baseData.filter(r => r.Ano === ano && r.Mes === mes);
     const total   = sum(recsMes);
     const casa    = sum(recsMes.filter(r => r.Canal === 'CASA'));
     const del     = sum(recsMes.filter(r => r.Canal === 'DELIVERY'));
 
     // YoY: mês atual vs mesmo mês ano anterior, cortado no mesmo dia
-    const recsAA = rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia <= lastDay);
+    const recsAA = baseData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia <= lastDay);
     const yoy    = variation(total, sum(recsAA));
 
     // Tend Fat
@@ -84,10 +92,10 @@ export default function Overview() {
     const recsMesDel  = recsMes.filter(r => r.Canal === 'DELIVERY');
     const tendFatCasa   = calcTendFat(recsMesCasa, lastDay, totalDays, ano, mes);
     const tendFatDel    = calcTendFat(recsMesDel,  lastDay, totalDays, ano, mes);
-    const totalAAFull   = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes));
+    const totalAAFull   = sum(baseData.filter(r => r.Ano === ano-1 && r.Mes === mes));
     const tendVsAA      = variation(tendFat, totalAAFull);
-    const totalAAFull_casa = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Canal === 'CASA'));
-    const totalAAFull_del  = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Canal === 'DELIVERY'));
+    const totalAAFull_casa = sum(baseData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Canal === 'CASA'));
+    const totalAAFull_del  = sum(baseData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Canal === 'DELIVERY'));
     const tendVsAACasa = variation(tendFatCasa, totalAAFull_casa);
     const tendVsAADel  = variation(tendFatDel,  totalAAFull_del);
 
@@ -102,7 +110,7 @@ export default function Overview() {
       tendFatCasa, tendFatDel, tendVsAACasa, tendVsAADel,
       pctCasa: total>0 ? casa/total*100 : 0,
       pctDel:  total>0 ? del/total*100  : 0 };
-  }, [rawData, periodo]);
+  }, [baseData, periodo]);
 
   // ── Contexto do mês ──────────────────────────────────────────────
   const contexto = useMemo(() => {
@@ -118,8 +126,8 @@ export default function Overview() {
     const mediaDiariaAtual = lastDay > 0 ? kpis.total / lastDay : 0;
 
     // Melhor dia da semana
-    const recsMes  = rawData.filter(r => r.Ano === ano && r.Mes === mes);
-    const recsAA   = rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia <= lastDay);
+    const recsMes  = baseData.filter(r => r.Ano === ano && r.Mes === mes);
+    const recsAA   = baseData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia <= lastDay);
     const melhorDia = Array.from({length:7},(_,dow) => {
       const r = recsMes.filter(x => x.Dia_Semana_Num === dow);
       const dias = new Set(r.map(x => x.Dia)).size;
@@ -131,15 +139,15 @@ export default function Overview() {
     }).filter(d => d.media > 0).sort((a,b) => b.media-a.media)[0];
 
     return { diasRestantes, pctMes, meta, necessarioPorDia, mediaDiariaAtual, melhorDia };
-  }, [periodo, kpis, rawData, lojas, getMetaTotal]);
+  }, [periodo, kpis, baseData, rawData, lojas, getMetaTotal]);
 
   // ── Gráfico mensal: barras ano atual + linha ano anterior ─────────
   const chartData = useMemo(() => {
     if (!periodo) return [];
     const { ano } = periodo;
-    const cur = monthlyTotals(rawData.filter(r => r.Ano === ano));
+    const cur = monthlyTotals(baseData.filter(r => r.Ano === ano));
     return cur.map(m => {
-      const prev = rawData.filter(r => r.Ano === ano-1 && r.Mes === m.mes);
+      const prev = baseData.filter(r => r.Ano === ano-1 && r.Mes === m.mes);
       const prevVal = prev.length > 0
         ? (m.key === periodo.key
           ? sum(prev.filter(r => r.Dia <= periodo.lastDay))
@@ -149,13 +157,13 @@ export default function Overview() {
       const jantarCasaMes = Math.max(0, (m.casa||0) - almocoMes);
       return { ...m, prevYear: prevVal, almoco: almocoMes, jantarCasa: jantarCasaMes };
     });
-  }, [rawData, periodo, getAlmoco]);
+  }, [baseData, periodo, getAlmoco]);
 
   // ── DOW e meta ───────────────────────────────────────────────────
   const dowData = useMemo(() => {
     if (!periodo) return [];
     const { ano, mes } = periodo;
-    return dowTotals(rawData.filter(r => r.Ano === ano && r.Mes === mes));
+    return dowTotals(baseData.filter(r => r.Ano === ano && r.Mes === mes));
   }, [rawData, periodo]);
 
   const metaProgresso = useMemo(() => {

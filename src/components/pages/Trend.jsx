@@ -78,20 +78,28 @@ export default function Trend() {
 
   const periodo = useMemo(() => getPeriodo(rawData), [rawData]);
 
+  // Aplica filtros de loja e canal (sem filtro de ano/mês) para YoY justo
+  const { filters } = useFilters();
+  const baseData = useMemo(() => rawData.filter(r => {
+    if (filters.lojas.size > 0 && !filters.lojas.has(r.Loja)) return false;
+    if (filters.canal !== 'Todos' && r.Canal !== filters.canal)  return false;
+    return true;
+  }), [rawData, filters]);
+
   // ── Dados do mês atual ─────────────────────────────────────────────────
   const mesAtual = useMemo(() => {
     if (!periodo) return null;
     const { latestKey, ano, mes, lastDay, totalDays } = periodo;
 
     // Registros do mês atual
-    const recs = rawData.filter(r => r.Ano_Mes === latestKey);
+    const recs = baseData.filter(r => r.Ano_Mes === latestKey);
     const realizado = sum(recs);
 
     // Tend Fat
     const tendFat = calcTendFat(recs, lastDay, totalDays, ano, mes);
 
     // Mesmo mês ano anterior (mês completo)
-    const recsAA = rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes);
+    const recsAA = baseData.filter(r => r.Ano === ano - 1 && r.Mes === mes);
     const totalAA = sum(recsAA);
 
     // YoY com corte (compara mesmos dias)
@@ -146,7 +154,7 @@ export default function Trend() {
     }).sort((a, b) => b.lojaReal - a.lojaReal);
 
     return { recs, realizado, tendFat, totalAA, yoy, tendVsAA, dowStats, porLoja };
-  }, [rawData, periodo]);
+  }, [baseData, periodo]);
 
   // ── YoY por mês (barras) ──────────────────────────────────────────────
   const yoyData = useMemo(() => {
@@ -154,7 +162,7 @@ export default function Trend() {
     const { ano, lastDay } = periodo;
     const monthly = monthlyTotals(rawData.filter(r => r.Ano === ano));
     return monthly.map(m => {
-      const prevRecs = rawData.filter(r => r.Ano === ano - 1 && r.Mes === m.mes);
+      const prevRecs = baseData.filter(r => r.Ano === ano - 1 && r.Mes === m.mes);
       if (!prevRecs.length) return { ...m, yoy: null };
       const isCurrentMonth = m.key === periodo.latestKey;
       const prevTotal = isCurrentMonth
@@ -162,7 +170,7 @@ export default function Trend() {
         : sum(prevRecs);
       return { ...m, yoy: variation(m.total, prevTotal) };
     }).filter(m => m.yoy !== null);
-  }, [rawData, periodo]);
+  }, [baseData, periodo]);
 
   if (!periodo || !mesAtual) return null;
 
