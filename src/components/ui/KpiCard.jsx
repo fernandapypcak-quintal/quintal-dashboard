@@ -1,6 +1,6 @@
 // src/components/ui/KpiCard.jsx
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { formatBRL, formatPercent } from '../../utils/formatters';
+import { formatBRL, formatPct } from '../../utils/formatters';
 import InfoTip from './InfoTip';
 
 export default function KpiCard({
@@ -59,7 +59,7 @@ export default function KpiCard({
             {isPositive && <TrendingUp size={11} />}
             {isNegative && <TrendingDown size={11} />}
             {isNeutral  && <Minus size={11} />}
-            {formatPercent(variation)}
+            {formatPct(variation)}
           </span>
         )}
         {variationLabel && <span className="text-xs text-zinc-400">{variationLabel}</span>}
