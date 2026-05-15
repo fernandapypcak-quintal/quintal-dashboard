@@ -208,6 +208,44 @@ export default function Overview() {
           variationLabel={`vs ${periodo.label.split('/')[0]}/${String(periodo.ano-1).slice(2)}`} delay={240} />
       </div>
 
+      {/* Almoço — só aparece se houver dados */}
+      {kpis.totalAlmoco > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <KpiCard title="Almoço — Total" value={kpis.totalAlmoco} icon={Home} accent="#0D9488"
+            tooltip="Faturamento total do almoço nas casas no mês atual."
+            subtitle={`${kpis.pesoAlmoco.toFixed(1).replace('.',',')}% do faturamento Casa`} delay={0} />
+          <KpiCard title="Jantar Casa" value={kpis.jantarCasa} icon={Home} accent="#8C1414"
+            tooltip="Faturamento Casa excluindo o almoço. Casa total − Almoço."
+            subtitle={`${(100-kpis.pesoAlmoco).toFixed(1).replace('.',',')}% do faturamento Casa`} delay={80} />
+          <div className="bg-white border border-surface-border rounded-2xl p-5">
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
+              Peso do Almoço por Loja
+            </p>
+            <div className="space-y-2">
+              {[...new Set(getAlmoco(periodo.ano, periodo.mes).map(r => r.Loja))].sort().map(loja => {
+                const vAlmoco = getAlmoco(periodo.ano, periodo.mes)
+                  .filter(r => r.Loja === loja).reduce((s,r) => s+r.Valor, 0);
+                const vCasa = rawData.filter(r =>
+                  r.Ano_Mes === periodo.key && r.Loja === loja && r.Canal === 'CASA'
+                ).reduce((s,r) => s+r.Valor, 0);
+                const peso = vCasa > 0 ? vAlmoco/vCasa*100 : 0;
+                return (
+                  <div key={loja} className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-600 truncate mr-2">{loja}</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="w-16 h-1.5 bg-surface-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-teal-500" style={{width:`${Math.min(peso,100)}%`}}/>
+                      </div>
+                      <span className="font-semibold text-zinc-700 w-10 text-right">{peso.toFixed(1)}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Contexto do mês */}
       {contexto && (
         <div className="bg-white border border-surface-border rounded-2xl p-5">
