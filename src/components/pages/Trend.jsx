@@ -101,10 +101,13 @@ export default function Trend() {
     // Tend vs AA
     const tendVsAA = variation(tendFat, totalAA);
 
-    // Médias por dia da semana do mês atual vs ano anterior (mesmo período)
+    // Médias por dia da semana:
+    // 2026 = até lastDay (dados disponíveis)
+    // 2025 = mês COMPLETO (igual à planilha de acompanhamento)
+    const recsAA_completo = recsAA; // sem corte de dia
     const dowStats = Array.from({length: 7}, (_, dow) => {
       const curRecs  = recs.filter(r => r.Dia_Semana_Num === dow);
-      const prevRecs = recsAA_corte.filter(r => r.Dia_Semana_Num === dow);
+      const prevRecs = recsAA_completo.filter(r => r.Dia_Semana_Num === dow);
       const diasCur  = new Set(curRecs.map(r => r.Data)).size;
       const diasPrev = new Set(prevRecs.map(r => r.Data)).size;
       const mediaCur  = diasCur  > 0 ? sum(curRecs)  / diasCur  : 0;
