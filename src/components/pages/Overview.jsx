@@ -45,35 +45,28 @@ const DOW_LABELS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domi
 
 
 // ── Tend Fat: realizado + projeção dias restantes por dia da semana ──────
-// Médias calculadas excluindo o último dia (que é o dia do update, d-1)
-// para alinhar com o cálculo da planilha de acompanhamento
+// Lógica idêntica à planilha de acompanhamento:
+// - Médias calculadas com TODOS os dias com dados (1 até lastDay inclusive)
+// - Projeção para os dias lastDay+1 até fim do mês
+// - Dia_Semana_Num no CSV: 0=Dom, 1=Seg...6=Sáb (igual JS getDay())
 function calcTendFat(recsAtual, lastDay, totalDays, ano, mes) {
   if (!recsAtual.length) return 0;
 
-  // Todos os dias com dados, excluindo o lastDay do cálculo de médias
-  // (lastDay = dia mais recente nos dados, cujos dados são o último dia completo)
-  // A planilha calcula médias dos dias ANTERIORES ao último dia registrado
-  const diasComDados = [...new Set(recsAtual.map(r => r.Data))].sort();
-  const diasParaMedia = diasComDados.slice(0, -1); // exclui o último dia
-
-  // Média por dia da semana (usando dias 1 até lastDay-1)
+  // Médias por dia da semana usando TODOS os dias disponíveis
   const mediaPorDow = {};
   for (let dow = 0; dow < 7; dow++) {
-    const recsDow = recsAtual.filter(r =>
-      r.Dia_Semana_Num === dow && diasParaMedia.includes(r.Data)
-    );
-    const diasDow = new Set(recsDow.map(r => r.Data)).size;
+    const recsDow = recsAtual.filter(r => r.Dia_Semana_Num === dow);
+    const diasDow  = new Set(recsDow.map(r => r.Data)).size;
     mediaPorDow[dow] = diasDow > 0
       ? recsDow.reduce((s, r) => s + r.Valor, 0) / diasDow
       : 0;
   }
 
-  // Projeção dos dias restantes a partir de lastDay+1
-  // CSV usa Dia_Semana_Num: 0=Dom, 1=Seg...6=Sáb (igual ao JS getDay())
-  // Não precisa converter - dow_js == dow_csv diretamente
+  // Projeção: dias lastDay+1 até fim do mês
+  // CSV usa 0=Dom igual ao JS getDay() — sem conversão necessária
   let projecaoRestante = 0;
   for (let dia = lastDay + 1; dia <= totalDays; dia++) {
-    const dow = new Date(ano, mes - 1, dia).getDay(); // 0=Dom, igual ao CSV
+    const dow = new Date(ano, mes - 1, dia).getDay();
     projecaoRestante += mediaPorDow[dow] || 0;
   }
 
