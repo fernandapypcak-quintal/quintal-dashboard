@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
+import { useAlmoco } from '../../hooks/useAlmoco';
 import { useMetas } from '../../hooks/useMetas';
 import { useLabels } from '../../hooks/useLabels';
 import { progressColor, AtingBadge } from '../ui/GoalProgress';
@@ -55,6 +56,7 @@ function calcTendFat(recsAtual, lastDay, totalDays, ano, mes) {
 export default function Stores() {
   const { rawData } = useFilters();
   const { getMeta } = useMetas();
+  const { almoco, getAlmocoLoja } = useAlmoco();
   const { showLabels } = useLabels();
   const [expandedLoja, setExpandedLoja] = useState(null);
 
@@ -100,6 +102,17 @@ export default function Stores() {
       const meta  = getMeta(latestKey, loja);
       const ating = meta > 0 ? realAtual / meta * 100 : null;
 
+      // Almoço desta loja
+      const recsAlmoco    = getAlmocoLoja(ano, mes, loja);
+      const totalAlmoco   = recsAlmoco.reduce((s,r) => s+r.Valor, 0);
+      const pesoAlmoco    = casa > 0 ? totalAlmoco/casa*100 : 0;
+      const jantarCasa    = Math.max(0, casa - totalAlmoco);
+      const allAlmocoLoja = almoco.filter(r => r.Loja === loja).sort((a,b) => a.Data.localeCompare(b.Data));
+      const inicioAlmoco  = allAlmocoLoja[0]?.Data || null;
+      const almocoMensal  = Object.entries(
+        allAlmocoLoja.reduce((acc,r) => { acc[r.Ano_Mes]=(acc[r.Ano_Mes]||0)+r.Valor; return acc; }, {})
+      ).sort(([a],[b]) => a.localeCompare(b));
+
       // Tend Fat
       // Tend Fat = realizado + projeção dos dias restantes por dia da semana
       const tendFat = calcTendFat(recsCur, lastDay, totalDays, ano, mes);
@@ -134,6 +147,8 @@ export default function Stores() {
         realAtual, realAA, casa, delivery,
         meta, ating, tendFat, tendVsAA, prevAAfull,
         share, yoy, melhorDia, monthly,
+        totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
+        totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
       };
     }).sort((a, b) => b.realAtual - a.realAtual);
   }, [lojas, rawData, periodo, getMeta]);
@@ -314,7 +329,11 @@ export default function Stores() {
                       </p>
                       <div className="space-y-0">
                         {[
-                          { label: 'Casa', value: formatBRL(l.casa), accent: l.color },
+                          { label: 'Casa Total', value: formatBRL(l.casa), accent: l.color },
+                          ...(l.totalAlmoco > 0 ? [
+                            { label: '↳ Almoço', value: formatBRL(l.totalAlmoco), accent: '#0D9488' },
+                            { label: '↳ Jantar', value: formatBRL(l.jantarCasa), accent: l.color },
+                          ] : []),
                           { label: 'Delivery', value: formatBRL(l.delivery), accent: '#D9B504' },
                           { label: `Realizado total`, value: formatBRL(l.realAtual), bold: true },
                           { label: `Mesmo período ${periodo.ano - 1} (dia ${periodo.lastDay})`, value: formatBRL(l.realAA), muted: true },
@@ -333,6 +352,48 @@ export default function Stores() {
                           </div>
                         ))}
                       </div>
+
+                      {/* Almoço evolution */}
+                      {l.totalAlmoco > 0 && (
+                        <div className="mt-4 pt-3 border-t border-surface-border">
+                          <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-2">
+                            Almoço — {periodo.label}
+                          </p>
+                          <div className="flex items-center justify-between text-xs mb-2">
+                            <span className="text-zinc-500">Início</span>
+                            <span className="font-semibold text-zinc-700">
+                              {l.inicioAlmoco ? l.inicioAlmoco.split('-').reverse().join('/') : '—'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs mb-2">
+                            <span className="text-zinc-500">Realizado almoço</span>
+                            <span className="font-semibold text-teal-600">{formatBRL(l.totalAlmoco)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs mb-3">
+                            <span className="text-zinc-500">Peso no Casa</span>
+                            <span className="font-semibold text-teal-600">{l.pesoAlmoco.toFixed(1).replace('.',',')}%</span>
+                          </div>
+                          {l.almocoMensal.length > 1 && (
+                            <div>
+                              <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1.5">Evolução mensal</p>
+                              <div className="space-y-1">
+                                {l.almocoMensal.map(([key, val]) => {
+                                  const max = Math.max(...l.almocoMensal.map(([,v]) => v));
+                                  return (
+                                    <div key={key} className="flex items-center gap-2 text-xs">
+                                      <span className="text-zinc-400 w-12 flex-shrink-0">{key.split('-')[1]}/{key.split('-')[0].slice(2)}</span>
+                                      <div className="flex-1 h-1.5 bg-surface-muted rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full bg-teal-500" style={{width:`${max>0?val/max*100:0}%`}}/>
+                                      </div>
+                                      <span className="font-semibold text-zinc-600 w-16 text-right">{formatBRL(val,true)}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Barra de atingimento */}
                       {l.ating !== null && (

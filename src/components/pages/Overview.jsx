@@ -140,15 +140,16 @@ export default function Overview() {
     const cur = monthlyTotals(rawData.filter(r => r.Ano === ano));
     return cur.map(m => {
       const prev = rawData.filter(r => r.Ano === ano-1 && r.Mes === m.mes);
-      // Linha do ano anterior: só mostra se tem dados reais
       const prevVal = prev.length > 0
         ? (m.key === periodo.key
-          ? sum(prev.filter(r => r.Dia <= periodo.lastDay)) // corte no mês atual
+          ? sum(prev.filter(r => r.Dia <= periodo.lastDay))
           : sum(prev))
         : null;
-      return { ...m, prevYear: prevVal };
+      const almocoMes    = getAlmoco(m.ano, m.mes).reduce((s,r) => s+r.Valor, 0);
+      const jantarCasaMes = Math.max(0, (m.casa||0) - almocoMes);
+      return { ...m, prevYear: prevVal, almoco: almocoMes, jantarCasa: jantarCasaMes };
     });
-  }, [rawData, periodo]);
+  }, [rawData, periodo, getAlmoco]);
 
   // ── DOW e meta ───────────────────────────────────────────────────
   const dowData = useMemo(() => {
@@ -329,8 +330,9 @@ export default function Overview() {
             <h3 className="section-title">Faturamento Mensal</h3>
             <p className="text-xs text-zinc-400 mt-0.5">Barras = {periodo.ano} · Linha = {periodo.ano-1}</p>
           </div>
-          <div className="flex items-center gap-4 text-xs text-zinc-500">
-            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block" style={{background:'#97A624'}}/>Casa</div>
+          <div className="flex items-center gap-3 text-xs text-zinc-500 flex-wrap">
+            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-teal-600"/>Almoço</div>
+            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block" style={{background:'#97A624'}}/>Jantar Casa</div>
             <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block" style={{background:'#D9B504'}}/>Delivery</div>
             <div className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed inline-block" style={{borderColor:'#8C1414'}}/>Ano ant.</div>
           </div>
@@ -340,9 +342,25 @@ export default function Overview() {
             <CartesianGrid strokeDasharray="3 3" stroke="#F0F0EC" vertical={false}/>
             <XAxis dataKey="label" tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false}/>
             <YAxis tickFormatter={v=>formatBRL(v,true)} tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false} width={76}/>
-            <Tooltip content={<CustomTooltip/>}/>
-            <Bar dataKey="casa"     name="Casa"     fill="#97A624" stackId="a" radius={[0,0,0,0]} maxBarSize={40} />
-            <Bar dataKey="delivery" name="Delivery" fill="#D9B504" stackId="a" radius={[3,3,0,0]} maxBarSize={40}>
+            <Tooltip content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const d = chartData.find(x => x.label === label);
+              return (
+                <div className="bg-white border border-surface-border rounded-xl shadow-card-hover p-3 min-w-[200px]">
+                  <p className="text-xs font-semibold text-zinc-500 mb-2">{label}</p>
+                  <div className="space-y-1.5 text-xs">
+                    {d?.almoco > 0 && <div className="flex justify-between gap-4"><span className="text-teal-600">Almoço</span><span className="font-semibold text-teal-600">{formatBRL(d.almoco, true)}</span></div>}
+                    {d?.almoco > 0 && <div className="flex justify-between gap-4"><span className="text-zinc-400">Jantar Casa</span><span className="font-semibold">{formatBRL(d.jantarCasa, true)}</span></div>}
+                    {!d?.almoco && <div className="flex justify-between gap-4"><span className="text-zinc-400">Casa</span><span className="font-semibold">{formatBRL(d?.casa||0, true)}</span></div>}
+                    <div className="flex justify-between gap-4"><span className="text-zinc-400">Delivery</span><span className="font-semibold">{formatBRL(d?.delivery||0, true)}</span></div>
+                    {d?.prevYear && <div className="flex justify-between gap-4 pt-1 border-t border-surface-border"><span className="text-zinc-400">Ano ant.</span><span className="text-zinc-400">{formatBRL(d.prevYear, true)}</span></div>}
+                  </div>
+                </div>
+              );
+            }}/>
+            <Bar dataKey="almoco"     name="Almoço"      fill="#0D9488" stackId="a" radius={[0,0,0,0]} maxBarSize={40} />
+            <Bar dataKey="jantarCasa" name="Jantar Casa"  fill="#97A624" stackId="a" radius={[0,0,0,0]} maxBarSize={40} />
+            <Bar dataKey="delivery"   name="Delivery"     fill="#D9B504" stackId="a" radius={[3,3,0,0]} maxBarSize={40}>
               <LabelList dataKey="delivery" content={(p) => {
                 if (!showLabels) return null;
                 const d = chartData[p.index];
