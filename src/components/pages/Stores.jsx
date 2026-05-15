@@ -164,7 +164,7 @@ export default function Stores() {
 
           return (
             <div key={l.loja}
-              className="bg-white border border-surface-border rounded-2xl overflow-hidden"
+              className="bg-white border border-surface-border rounded-2xl"
               style={{ borderLeft: `4px solid ${l.color}` }}
             >
               {/* Header — sempre visível */}
