@@ -264,6 +264,18 @@ export default function Trend() {
                 {mesAtual.porLoja.map((d, i) => (
                   <Cell key={i} fill={d.tendVsAA !== null && d.tendVsAA >= 0 ? '#97A624' : '#8C1414'} />
                 ))}
+                <LabelList dataKey="lojaTend" position="right" content={(props) => {
+                  const d = mesAtual.porLoja[props.index];
+                  if (!d || d.tendVsAA === null) return null;
+                  const v = d.tendVsAA;
+                  const color = v >= 0 ? '#059669' : '#dc2626';
+                  return (
+                    <text x={(props.x||0)+(props.width||0)+6} y={(props.y||0)+(props.height||0)/2}
+                      dominantBaseline="middle" fontSize={10} fontWeight={700} fill={color} fontFamily="DM Sans">
+                      {v >= 0 ? '+' : ''}{v.toFixed(1).replace('.',',')}%
+                    </text>
+                  );
+                }}/>
               </Bar>
             </BarChart>
           </ResponsiveContainer>
