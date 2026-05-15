@@ -34,7 +34,7 @@ function calcTendFat(recsAtual, lastDay, totalDays, ano, mes) {
   const mediaPorDow = {};
   for (let dow = 0; dow < 7; dow++) {
     const recsDow = recsAtual.filter(r => r.Dia_Semana_Num === dow);
-    const diasDow  = new Set(recsDow.map(r => r.Data)).size;
+    const diasDow  = new Set(recsDow.map(r => r.Dia)).size;
     mediaPorDow[dow] = diasDow > 0
       ? recsDow.reduce((s, r) => s + r.Valor, 0) / diasDow
       : 0;
@@ -133,7 +133,7 @@ export default function Stores() {
         loja, color, idx,
         realAtual, realAA, casa, delivery,
         meta, ating, tendFat, tendVsAA, prevAAfull,
-        share, yoy, melhorDia, monthly, mediaDiaria,
+        share, yoy, melhorDia, monthly,
       };
     }).sort((a, b) => b.realAtual - a.realAtual);
   }, [lojas, rawData, periodo, getMeta]);
