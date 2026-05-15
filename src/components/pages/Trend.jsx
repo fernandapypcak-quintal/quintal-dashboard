@@ -28,7 +28,7 @@ function calcTendFat(recsAtual, lastDay, totalDays, ano, mes) {
   const mediaPorDow = {};
   for (let dow = 0; dow < 7; dow++) {
     const recsDow = recsAtual.filter(r => r.Dia_Semana_Num === dow);
-    const diasDow  = new Set(recsDow.map(r => r.Data)).size;
+    const diasDow  = new Set(recsDow.map(r => r.Dia)).size;
     mediaPorDow[dow] = diasDow > 0 ? sum(recsDow) / diasDow : 0;
   }
 
@@ -102,14 +102,16 @@ export default function Trend() {
     const tendVsAA = variation(tendFat, totalAA);
 
     // Médias por dia da semana:
-    // 2026 = até lastDay (dados disponíveis)
+    // 2026 = dias ANTERIORES ao lastDay (< lastDay, igual à fórmula da planilha)
     // 2025 = mês COMPLETO (igual à planilha de acompanhamento)
+    const recsParaMedia = recs.filter(r => r.Dia < lastDay); // strict < como na planilha
     const recsAA_completo = recsAA; // sem corte de dia
     const dowStats = Array.from({length: 7}, (_, dow) => {
-      const curRecs  = recs.filter(r => r.Dia_Semana_Num === dow);
+      const curRecs  = recsParaMedia.filter(r => r.Dia_Semana_Num === dow);
       const prevRecs = recsAA_completo.filter(r => r.Dia_Semana_Num === dow);
-      const diasCur  = new Set(curRecs.map(r => r.Data)).size;
-      const diasPrev = new Set(prevRecs.map(r => r.Data)).size;
+      // Usa r.Dia (número) para contar dias distintos — evita problemas de formato de data
+      const diasCur  = new Set(curRecs.map(r => r.Dia)).size;
+      const diasPrev = new Set(prevRecs.map(r => r.Dia)).size;
       const mediaCur  = diasCur  > 0 ? sum(curRecs)  / diasCur  : 0;
       const mediaPrev = diasPrev > 0 ? sum(prevRecs) / diasPrev : 0;
       return {
