@@ -1,7 +1,7 @@
 // src/data/loader.js
 // Carrega dados de faturamento do Google Apps Script
 
-const APPSCRIPT_URL = 'https://script.google.com/macros/s/AKfycbykKgqbmU76C5l0vB_sE7p77kcoDqXBzbacMOjhzaD3Twrgn3GJktMe-rMoxrM1pR8U/exec';
+const APPSCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEoeYAWVUGc8n-_J61Sd91XDhkRPJOaVQnvUbk_-UcWyuaRtoyvFwtqMMcFq8_H80vwA/exec';
 
 function parseDate(val) {
   if (!val) return '';
@@ -16,6 +16,7 @@ function parseAnoMes(val) {
   if (!val) return '';
   if (typeof val === 'string' && val.match(/^\d{4}-\d{2}$/)) return val;
   const d = new Date(val);
+  
   if (isNaN(d)) return String(val);
   return d.toISOString().slice(0, 7); // "2025-01"
 }

@@ -3,7 +3,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const MetasContext   = createContext(null);
 const STORAGE_KEY    = 'quintal_metas_v1';
-const APPSCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbykKgqbmU76C5l0vB_sE7p77kcoDqXBzbacMOjhzaD3Twrgn3GJktMe-rMoxrM1pR8U/exec';
+const APPSCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbyEoeYAWVUGc8n-_J61Sd91XDhkRPJOaVQnvUbk_-UcWyuaRtoyvFwtqMMcFq8_H80vwA/exec';
 
 function toKey(ano, mes) {
   return `${ano}-${String(mes).padStart(2, '0')}`;
