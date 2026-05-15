@@ -8,7 +8,6 @@ import {
 const NAV = [
   { id: 'overview', label: 'Visão Geral',  icon: LayoutDashboard },
   { id: 'trend',    label: 'Tendência',    icon: TrendingUp },
-  { id: 'yoy',      label: 'Ano vs Ano',   icon: CalendarRange },
   { id: 'weekly',   label: 'Semanal',      icon: Calendar },
   { id: 'stores',   label: 'Por Loja',     icon: Store },
   { id: 'history',  label: 'Histórico',    icon: Table2 },

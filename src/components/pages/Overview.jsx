@@ -77,10 +77,20 @@ export default function Overview() {
 
     // Tend Fat
     const tendFat  = calcTendFat(recsMes, lastDay, totalDays, ano, mes);
-    const totalAAFull = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes));
-    const tendVsAA = variation(tendFat, totalAAFull);
+    // Tend Fat por canal
+    const recsMesCasa = recsMes.filter(r => r.Canal === 'CASA');
+    const recsMesDel  = recsMes.filter(r => r.Canal === 'DELIVERY');
+    const tendFatCasa   = calcTendFat(recsMesCasa, lastDay, totalDays, ano, mes);
+    const tendFatDel    = calcTendFat(recsMesDel,  lastDay, totalDays, ano, mes);
+    const totalAAFull   = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes));
+    const tendVsAA      = variation(tendFat, totalAAFull);
+    const totalAAFull_casa = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Canal === 'CASA'));
+    const totalAAFull_del  = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Canal === 'DELIVERY'));
+    const tendVsAACasa = variation(tendFatCasa, totalAAFull_casa);
+    const tendVsAADel  = variation(tendFatDel,  totalAAFull_del);
 
     return { total, casa, del, yoy, tendFat, tendVsAA,
+      tendFatCasa, tendFatDel, tendVsAACasa, tendVsAADel,
       pctCasa: total>0 ? casa/total*100 : 0,
       pctDel:  total>0 ? del/total*100  : 0 };
   }, [rawData, periodo]);
@@ -171,12 +181,14 @@ export default function Overview() {
           tooltip="Faturamento acumulado do mês atual. YoY compara com o mesmo período do ano anterior."
           variation={kpis.yoy}
           variationLabel={`YoY até dia ${periodo.lastDay}`} delay={0} />
-        <KpiCard title="Casa" value={kpis.casa} icon={Home} accent="#8C1414"
-          tooltip="Faturamento do canal Casa no mês atual."
-          subtitle={`${formatPctPlain(kpis.pctCasa)} do total`} delay={80} />
-        <KpiCard title="Delivery" value={kpis.del} icon={Truck} accent="#D9B504"
-          tooltip="Faturamento do canal Delivery no mês atual."
-          subtitle={`${formatPctPlain(kpis.pctDel)} do total`} delay={160} />
+        <KpiCard title="Tend Fat — Casa" value={kpis.tendFatCasa} icon={Home} accent="#8C1414"
+          tooltip="Projeção do mês para o canal Casa. Mesma fórmula do Tend Fat total."
+          variation={kpis.tendVsAACasa}
+          variationLabel={`vs ${periodo?.label?.split('/')[0]}/${String(periodo?.ano-1).slice(2)}`} delay={80} />
+        <KpiCard title="Tend Fat — Delivery" value={kpis.tendFatDel} icon={Truck} accent="#D9B504"
+          tooltip="Projeção do mês para o canal Delivery. Mesma fórmula do Tend Fat total."
+          variation={kpis.tendVsAADel}
+          variationLabel={`vs ${periodo?.label?.split('/')[0]}/${String(periodo?.ano-1).slice(2)}`} delay={160} />
         <KpiCard title="Projeção do Mês" value={kpis.tendFat} icon={Target} accent="#97A624"
           tooltip="Tend Fat = Realizado + Σ(média de cada dia da semana × dias restantes). Mesma fórmula da planilha."
           variation={kpis.tendVsAA}

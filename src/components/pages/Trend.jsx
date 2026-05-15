@@ -122,11 +122,22 @@ export default function Trend() {
     const lojas = [...new Set(rawData.map(r => r.Loja))].sort();
     const porLoja = lojas.map(loja => {
       const lojaRecs = recs.filter(r => r.Loja === loja);
-      const lojaReal = sum(lojaRecs);
-      const peso      = realizado > 0 ? lojaReal / realizado : 0;
-      const lojaTend  = calcTendFat(lojaRecs, lastDay, totalDays, ano, mes);
-      const lojaAA    = sum(recsAA.filter(r => r.Loja === loja));
-      return { loja, lojaReal, peso, lojaTend, lojaAA, tendVsAA: variation(lojaTend, lojaAA) };
+      const lojaReal     = sum(lojaRecs);
+      const lojaRecsCasa = lojaRecs.filter(r => r.Canal === 'CASA');
+      const lojaRecsDel  = lojaRecs.filter(r => r.Canal === 'DELIVERY');
+      const peso         = realizado > 0 ? lojaReal / realizado : 0;
+      const lojaTend     = calcTendFat(lojaRecs,     lastDay, totalDays, ano, mes);
+      const lojaTendCasa = calcTendFat(lojaRecsCasa, lastDay, totalDays, ano, mes);
+      const lojaTendDel  = calcTendFat(lojaRecsDel,  lastDay, totalDays, ano, mes);
+      const lojaAA       = sum(recsAA.filter(r => r.Loja === loja));
+      const lojaAACasa   = sum(recsAA.filter(r => r.Loja === loja && r.Canal === 'CASA'));
+      const lojaAADel    = sum(recsAA.filter(r => r.Loja === loja && r.Canal === 'DELIVERY'));
+      return { loja, lojaReal, peso,
+        lojaTend, lojaTendCasa, lojaTendDel,
+        lojaAA, lojaAACasa, lojaAADel,
+        tendVsAA:     variation(lojaTend,     lojaAA),
+        tendVsAACasa: variation(lojaTendCasa, lojaAACasa),
+        tendVsAADel:  variation(lojaTendDel,  lojaAADel) };
     }).sort((a, b) => b.lojaReal - a.lojaReal);
 
     return { recs, realizado, tendFat, totalAA, yoy, tendVsAA, dowStats, porLoja };
@@ -264,41 +275,51 @@ export default function Trend() {
           <thead>
             <tr className="border-b border-surface-border">
               <th className="table-header text-left py-2 pr-4">Loja</th>
-              <th className="table-header text-right py-2 px-4">Realizado (dia {periodo.lastDay})</th>
-              <th className="table-header text-right py-2 px-4">Peso</th>
-              <th className="table-header text-right py-2 px-4">Tend Fat {periodo.ano}</th>
-              <th className="table-header text-right py-2 px-4">Mesmo mês {periodo.ano - 1}</th>
-              <th className="table-header text-right py-2 pl-4">Tend vs AA</th>
+              <th className="table-header text-right py-2 px-3">Realizado</th>
+              <th className="table-header text-right py-2 px-3">Peso</th>
+              <th className="table-header text-right py-2 px-3">Tend Fat Total</th>
+              <th className="table-header text-right py-2 px-3">Tend Fat Casa</th>
+              <th className="table-header text-right py-2 px-3">Tend Fat Del</th>
+              <th className="table-header text-right py-2 px-3">AA Completo</th>
+              <th className="table-header text-right py-2 px-3">Tend vs AA</th>
+              <th className="table-header text-right py-2 px-3">Casa vs AA</th>
+              <th className="table-header text-right py-2 pl-4">Del vs AA</th>
             </tr>
           </thead>
           <tbody>
             {mesAtual.porLoja.map(d => (
               <tr key={d.loja} className="border-b border-surface-border/50 hover:bg-surface-muted/50 transition-colors">
                 <td className="py-3 pr-4 font-medium text-brand-black">{d.loja}</td>
-                <td className="py-3 px-4 text-right font-mono text-sm">{formatBRL(d.lojaReal)}</td>
-                <td className="py-3 px-4 text-right">
+                <td className="py-3 px-3 text-right font-mono text-sm">{formatBRL(d.lojaReal)}</td>
+                <td className="py-3 px-3 text-right">
                   <span className="text-xs font-semibold px-2 py-0.5 bg-surface-muted rounded-full text-zinc-600">{(d.peso*100).toFixed(1)}%</span>
                 </td>
-                <td className="py-3 px-4 text-right font-mono text-sm font-semibold text-brand-black">{formatBRL(d.lojaTend)}</td>
-                <td className="py-3 px-4 text-right font-mono text-sm text-zinc-400">{formatBRL(d.lojaAA)}</td>
-                <td className="py-3 pl-4 text-right">
-                  {d.tendVsAA !== null ? (
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${d.tendVsAA >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
-                      {d.tendVsAA >= 0 ? '▲' : '▼'} {Math.abs(d.tendVsAA).toFixed(1).replace('.', ',')}%
-                    </span>
-                  ) : '—'}
-                </td>
+                <td className="py-3 px-3 text-right font-mono text-sm font-semibold text-brand-black">{formatBRL(d.lojaTend)}</td>
+                <td className="py-3 px-3 text-right font-mono text-sm text-brand-olive">{formatBRL(d.lojaTendCasa||0)}</td>
+                <td className="py-3 px-3 text-right font-mono text-sm" style={{color:'#D9B504'}}>{formatBRL(d.lojaTendDel||0)}</td>
+                <td className="py-3 px-3 text-right font-mono text-sm text-zinc-400">{formatBRL(d.lojaAA)}</td>
+                {[['t',d.tendVsAA],['c',d.tendVsAACasa],['d',d.tendVsAADel]].map(([k,v])=>(
+                  <td key={k} className="py-3 px-3 text-right">
+                    {v !== null ? (
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${v >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
+                        {v >= 0 ? '▲' : '▼'} {Math.abs(v).toFixed(1).replace('.', ',')}%
+                      </span>
+                    ) : '—'}
+                  </td>
+                ))}
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-surface-border bg-surface-muted/30">
               <td className="py-3 pr-4 text-xs font-semibold text-zinc-500 uppercase">Total</td>
-              <td className="py-3 px-4 text-right font-mono text-sm font-bold">{formatBRL(mesAtual.realizado)}</td>
-              <td className="py-3 px-4 text-right text-xs font-semibold text-zinc-400">100%</td>
-              <td className="py-3 px-4 text-right font-mono text-sm font-bold text-brand-black">{formatBRL(mesAtual.tendFat)}</td>
-              <td className="py-3 px-4 text-right font-mono text-sm text-zinc-400">{formatBRL(mesAtual.totalAA)}</td>
-              <td className="py-3 pl-4 text-right">
+              <td className="py-3 px-3 text-right font-mono text-sm font-bold">{formatBRL(mesAtual.realizado)}</td>
+              <td className="py-3 px-3 text-right text-xs font-semibold text-zinc-400">100%</td>
+              <td className="py-3 px-3 text-right font-mono text-sm font-bold text-brand-black">{formatBRL(mesAtual.tendFat)}</td>
+              <td className="py-3 px-3 text-right font-mono text-sm text-brand-olive">{formatBRL(mesAtual.porLoja.reduce((s,d)=>s+(d.lojaTendCasa||0),0))}</td>
+              <td className="py-3 px-3 text-right font-mono text-sm" style={{color:'#D9B504'}}>{formatBRL(mesAtual.porLoja.reduce((s,d)=>s+(d.lojaTendDel||0),0))}</td>
+              <td className="py-3 px-3 text-right font-mono text-sm text-zinc-400">{formatBRL(mesAtual.totalAA)}</td>
+              <td className="py-3 px-3 text-right" colSpan={3}>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${mesAtual.tendVsAA >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
                   {mesAtual.tendVsAA >= 0 ? '▲' : '▼'} {Math.abs(mesAtual.tendVsAA).toFixed(1).replace('.', ',')}%
                 </span>

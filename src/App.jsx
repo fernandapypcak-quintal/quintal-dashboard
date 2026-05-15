@@ -7,7 +7,6 @@ import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import Overview from './components/pages/Overview';
 import Trend from './components/pages/Trend';
-import YoY from './components/pages/YoY';
 import Weekly from './components/pages/Weekly';
 import Stores from './components/pages/Stores';
 import History from './components/pages/History';
