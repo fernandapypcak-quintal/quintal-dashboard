@@ -92,3 +92,60 @@ export function dowTotals(recs) {
     return { label, dow, casa, delivery, total: casa+delivery };
   });
 }
+
+// ── Aliases de compatibilidade ─────────────────────────────────────────────
+export const sumValues        = sum;
+export const calcVariation    = variation;
+export const formatPercent    = formatPct;
+export const formatPercentPlain = formatPctPlain;
+export const getMonthlyTotals = monthlyTotals;
+
+// Totais por loja
+export function getStoreTotals(recs) {
+  const g = groupBy(recs, 'Loja');
+  return Object.entries(g)
+    .map(([loja, rows]) => ({
+      loja,
+      casa:     sum(rows.filter(r => r.Canal === 'CASA')),
+      delivery: sum(rows.filter(r => r.Canal === 'DELIVERY')),
+      total:    sum(rows),
+    }))
+    .sort((a,b) => b.total - a.total);
+}
+
+// Totais por semana
+export function getWeeklyTotals(recs) {
+  const g = groupBy(recs, 'Semana_Label');
+  return Object.entries(g)
+    .map(([key, rows]) => {
+      const f = rows[0];
+      return {
+        key, label: key,
+        semana: f.Semana_ISO, ano: f.Ano,
+        weekStart: f.Semana_Inicio,
+        casa:     sum(rows.filter(r => r.Canal === 'CASA')),
+        delivery: sum(rows.filter(r => r.Canal === 'DELIVERY')),
+        total:    sum(rows),
+      };
+    })
+    .sort((a,b) => (a.weekStart||'').localeCompare(b.weekStart||''));
+}
+
+// Totais por dia
+export function getDailyTotals(recs) {
+  const g = groupBy(recs, 'Data');
+  return Object.entries(g)
+    .map(([date, rows]) => {
+      const f = rows[0];
+      return {
+        date, diaSemana: f.Dia_Semana_Abrev,
+        diaSemanaNum: f.Dia_Semana_Num,
+        casa:     sum(rows.filter(r => r.Canal === 'CASA')),
+        delivery: sum(rows.filter(r => r.Canal === 'DELIVERY')),
+        total:    sum(rows),
+      };
+    })
+    .sort((a,b) => a.date.localeCompare(b.date));
+}
+
+export const getDOWTotals = dowTotals;

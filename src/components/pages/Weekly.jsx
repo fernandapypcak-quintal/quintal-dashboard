@@ -6,7 +6,7 @@ import {
 } from 'recharts';
 import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
-import { sumValues, formatBRL, calcVariation, formatPercent } from '../../utils/formatters';
+import { sum, formatBRL, variation, formatPct } from '../../utils/formatters';
 import { Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import InfoTip from '../ui/InfoTip';
 
@@ -43,9 +43,9 @@ function getWeeksOfMonth(records, ano, mes) {
       label: `S${i + 1}`,
       labelFull: w.label,
       inicio: w.inicio,
-      casa:     sumValues(w.records.filter(r => r.Canal === 'CASA')),
-      delivery: sumValues(w.records.filter(r => r.Canal === 'DELIVERY')),
-      total:    sumValues(w.records),
+      casa:     sum(w.records.filter(r => r.Canal === 'CASA')),
+      delivery: sum(w.records.filter(r => r.Canal === 'DELIVERY')),
+      total:    sum(w.records),
     }));
 }
 
@@ -78,7 +78,7 @@ export default function Weekly() {
 
     return semanasAtual.map((s, i) => {
       const ant = semanasAnt[i];
-      const yoy = ant ? calcVariation(s.total, ant.total) : null;
+      const yoy = ant ? variation(s.total, ant.total) : null;
       return {
         ...s,
         totalAnt:    ant?.total    || null,
@@ -95,10 +95,10 @@ export default function Weekly() {
     if (!semanaData.length) return null;
     const ultima = semanaData[semanaData.length - 1];
     const penultima = semanaData[semanaData.length - 2];
-    const wowVar = penultima ? calcVariation(ultima.total, penultima.total) : null;
+    const wowVar = penultima ? variation(ultima.total, penultima.total) : null;
     const totalMes = semanaData.reduce((s, w) => s + w.total, 0);
     const totalMesAnt = semanaData.reduce((s, w) => s + (w.totalAnt || 0), 0);
-    const yoyMes = totalMesAnt > 0 ? calcVariation(totalMes, totalMesAnt) : null;
+    const yoyMes = totalMesAnt > 0 ? variation(totalMes, totalMesAnt) : null;
     return { ultima, wowVar, totalMes, yoyMes };
   }, [semanaData]);
 
@@ -126,13 +126,13 @@ export default function Weekly() {
             {kpis.wowVar !== null && (
               <div className={`flex items-center gap-1 mt-2 text-xs font-semibold ${kpis.wowVar >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {kpis.wowVar >= 0 ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
-                {formatPercent(kpis.wowVar)} vs semana ant.
+                {formatPct(kpis.wowVar)} vs semana ant.
               </div>
             )}
             {kpis.ultima.yoy !== null && (
               <div className={`flex items-center gap-1 mt-1 text-xs font-semibold ${kpis.ultima.yoy >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {kpis.ultima.yoy >= 0 ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
-                {formatPercent(kpis.ultima.yoy)} YoY
+                {formatPct(kpis.ultima.yoy)} YoY
               </div>
             )}
           </div>
@@ -142,7 +142,7 @@ export default function Weekly() {
             {kpis.yoyMes !== null && (
               <div className={`flex items-center gap-1 mt-2 text-xs font-semibold ${kpis.yoyMes >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {kpis.yoyMes >= 0 ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
-                {formatPercent(kpis.yoyMes)} vs {periodo.label.split('/')[0]}/{String(periodo.ano - 1).slice(2)}
+                {formatPct(kpis.yoyMes)} vs {periodo.label.split('/')[0]}/{String(periodo.ano - 1).slice(2)}
               </div>
             )}
           </div>

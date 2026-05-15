@@ -9,7 +9,7 @@ import { useFilters } from '../../hooks/useFilters';
 import { useMetas } from '../../hooks/useMetas';
 import { useLabels } from '../../hooks/useLabels';
 import { progressColor, AtingBadge } from '../ui/GoalProgress';
-import { sumValues, getMonthlyTotals, formatBRL, calcVariation } from '../../utils/formatters';
+import { sum, monthlyTotals, formatBRL, variation } from '../../utils/formatters';
 import InfoTip from '../ui/InfoTip';
 
 const STORE_COLORS = ['#97A624','#D9B504','#D9CB04','#8C1414','#0D9488','#7C3AED','#EA580C','#0284C7','#65A30D','#6B7280'];
@@ -78,23 +78,23 @@ export default function Stores() {
   const lojaStats = useMemo(() => {
     if (!periodo) return [];
     const { latestKey, ano, mes, lastDay, totalDays } = periodo;
-    const grandTotal = sumValues(rawData.filter(r => r.Ano_Mes === latestKey));
+    const grandTotal = sum(rawData.filter(r => r.Ano_Mes === latestKey));
 
     return lojas.map((loja, idx) => {
       const color = STORE_COLORS[idx % STORE_COLORS.length];
 
       // Mês atual
       const recsCur   = rawData.filter(r => r.Ano_Mes === latestKey && r.Loja === loja);
-      const realAtual = sumValues(recsCur);
-      const casa      = sumValues(recsCur.filter(r => r.Canal === 'CASA'));
-      const delivery  = sumValues(recsCur.filter(r => r.Canal === 'DELIVERY'));
+      const realAtual = sum(recsCur);
+      const casa      = sum(recsCur.filter(r => r.Canal === 'CASA'));
+      const delivery  = sum(recsCur.filter(r => r.Canal === 'DELIVERY'));
 
       // Mesmo período ano anterior (com corte no mesmo dia)
       const recsAA = rawData.filter(r =>
         r.Ano === ano - 1 && r.Mes === mes && r.Loja === loja && r.Dia <= lastDay
       );
-      const realAA = sumValues(recsAA);
-      const yoy    = calcVariation(realAtual, realAA);
+      const realAA = sum(recsAA);
+      const yoy    = variation(realAtual, realAA);
 
       // Meta e atingimento
       const meta  = getMeta(latestKey, loja);
@@ -103,10 +103,10 @@ export default function Stores() {
       // Tend Fat
       // Tend Fat = realizado + projeção dos dias restantes por dia da semana
       const tendFat = calcTendFat(recsCur, lastDay, totalDays, ano, mes);
-      const prevAAfull  = sumValues(rawData.filter(r =>
+      const prevAAfull  = sum(rawData.filter(r =>
         r.Ano === ano - 1 && r.Mes === mes && r.Loja === loja
       ));
-      const tendVsAA = calcVariation(tendFat, prevAAfull);
+      const tendVsAA = variation(tendFat, prevAAfull);
 
       // Share
       const share = grandTotal > 0 ? realAtual / grandTotal * 100 : 0;
@@ -115,18 +115,18 @@ export default function Stores() {
       const dowStats = DOW_LABELS.map((label, dowIdx) => {
         const recs = recsCur.filter(r => r.Dia_Semana_Num === dowIdx);
         const dias = [...new Set(recs.map(r => r.Data))].length;
-        return { label: label.slice(0, 3), media: dias > 0 ? sumValues(recs) / dias : 0 };
+        return { label: label.slice(0, 3), media: dias > 0 ? sum(recs) / dias : 0 };
       }).filter(d => d.media > 0);
       const melhorDia = [...dowStats].sort((a, b) => b.media - a.media)[0];
 
       // Evolução mensal — só o ano atual (sem misturar anos)
-      const monthly = getMonthlyTotals(
+      const monthly = monthlyTotals(
         rawData.filter(r => r.Loja === loja && r.Ano === ano)
       ).map(m => {
         const prevRecs = rawData.filter(r =>
           r.Ano === ano - 1 && r.Mes === m.mes && r.Loja === loja
         );
-        return { ...m, prevYear: prevRecs.length > 0 ? sumValues(prevRecs) : null };
+        return { ...m, prevYear: prevRecs.length > 0 ? sum(prevRecs) : null };
       });
 
       return {

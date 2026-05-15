@@ -8,7 +8,7 @@ import {
 import { useLabels } from '../../hooks/useLabels';
 import { useFilters } from '../../hooks/useFilters';
 import { CustomTooltip } from '../ui/ChartTooltip';
-import { sumValues, formatBRL, formatPercentPlain, calcVariation, formatPercent } from '../../utils/formatters';
+import { sum, formatBRL, formatPctPlain, variation, formatPct } from '../../utils/formatters';
 import { TrendingUp, TrendingDown, Info, Scissors } from 'lucide-react';
 import InfoTip from '../ui/InfoTip';
 
@@ -57,7 +57,7 @@ export default function YoY() {
         return 0;
       }
     }
-    return sumValues(recs);
+    return sum(recs);
   }
 
   // Monthly comparison data
@@ -92,14 +92,14 @@ export default function YoY() {
       const allRecs = filteredData.filter(r => r.Ano === year);
       const recs    = cutRecs(allRecs);
 
-      const total = sumValues(recs);
-      const casa  = sumValues(recs.filter(r => r.Canal === 'CASA'));
-      const del   = sumValues(recs.filter(r => r.Canal === 'DELIVERY'));
+      const total = sum(recs);
+      const casa  = sum(recs.filter(r => r.Canal === 'CASA'));
+      const del   = sum(recs.filter(r => r.Canal === 'DELIVERY'));
 
       const prevYear = years[i - 1];
       const prevRecs = prevYear ? cutRecs(filteredData.filter(r => r.Ano === prevYear)) : [];
 
-      const growth    = calcVariation(total, sumValues(prevRecs));
+      const growth    = variation(total, sum(prevRecs));
 
       // growthAdj = same as growth when adjusted is on (already cut),
       // otherwise compute it separately for the table column
@@ -113,7 +113,7 @@ export default function YoY() {
           r.Ano === prevYear &&
           (r.Mes < cutoff.month || (r.Mes === cutoff.month && r.Dia <= cutoff.day))
         );
-        growthAdj = calcVariation(sumValues(curCut), sumValues(prevCut));
+        growthAdj = variation(sum(curCut), sum(prevCut));
       }
 
       return { year, total, casa, del, growth, growthAdj, isCurrentYear };
@@ -162,7 +162,7 @@ export default function YoY() {
                 }`}>
                   {(adjusted && d.growthAdj !== null ? d.growthAdj : d.growth) >= 0
                     ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
-                  {formatPercent(adjusted && d.growthAdj !== null ? d.growthAdj : d.growth)}
+                  {formatPct(adjusted && d.growthAdj !== null ? d.growthAdj : d.growth)}
                   <span className="text-zinc-400 font-normal ml-0.5">
                     {adjusted ? 'mesmo período' : 'YoY'}
                   </span>
@@ -346,18 +346,18 @@ export default function YoY() {
                 <td className="py-3 px-4 text-right font-mono text-sm">{formatBRL(d.total)}</td>
                 <td className="py-3 px-4 text-right font-mono text-sm text-brand-olive">{formatBRL(d.casa)}</td>
                 <td className="py-3 px-4 text-right font-mono text-sm" style={{ color: '#D9B504' }}>{formatBRL(d.del)}</td>
-                <td className="py-3 px-4 text-right text-sm">{d.total > 0 ? formatPercentPlain(d.del/d.total*100) : '—'}</td>
+                <td className="py-3 px-4 text-right text-sm">{d.total > 0 ? formatPctPlain(d.del/d.total*100) : '—'}</td>
                 <td className="py-3 px-4 text-right">
                   {d.growth !== null ? (
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${d.growth >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
-                      {formatPercent(d.growth)}
+                      {formatPct(d.growth)}
                     </span>
                   ) : <span className="text-zinc-300">—</span>}
                 </td>
                 <td className="py-3 pl-4 text-right">
                   {d.growthAdj !== null ? (
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${d.growthAdj >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
-                      {formatPercent(d.growthAdj)}
+                      {formatPct(d.growthAdj)}
                     </span>
                   ) : <span className="text-zinc-300">—</span>}
                 </td>

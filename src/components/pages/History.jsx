@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useFilters } from '../../hooks/useFilters';
 import { useMetas } from '../../hooks/useMetas';
 import { AtingBadge } from '../ui/GoalProgress';
-import { getMonthlyTotals, formatBRL, formatPercentPlain, calcVariation, formatPercent } from '../../utils/formatters';
+import { monthlyTotals, formatBRL, formatPctPlain, variation, formatPct } from '../../utils/formatters';
 import { ChevronUp, ChevronDown, ChevronsUpDown, Download } from 'lucide-react';
 
 function SortIcon({ field, sortField, sortDir }) {
@@ -23,12 +23,12 @@ export default function History() {
   const lojas = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
   const monthly = useMemo(() => {
-    return getMonthlyTotals(filteredData).map((d, i, arr) => {
+    return monthlyTotals(filteredData).map((d, i, arr) => {
       const meta  = getMetaTotal(d.key, lojas);
       const ating = meta > 0 ? (d.total / meta) * 100 : null;
       return {
         ...d,
-        growth: i > 0 ? calcVariation(d.total, arr[i - 1].total) : null,
+        growth: i > 0 ? variation(d.total, arr[i - 1].total) : null,
         pctCasa: d.total > 0 ? d.casa / d.total * 100 : 0,
         pctDel:  d.total > 0 ? d.delivery / d.total * 100 : 0,
         meta, ating,
@@ -138,11 +138,11 @@ export default function History() {
                 <td className="py-3 px-3 text-right font-mono text-sm font-semibold text-brand-black">{formatBRL(d.total)}</td>
                 <td className="py-3 px-3 text-right font-mono text-xs text-zinc-400">{d.meta ? formatBRL(d.meta) : '—'}</td>
                 <td className="py-3 px-3 text-right"><AtingBadge pct={d.ating} /></td>
-                <td className="py-3 px-3 text-right text-xs text-zinc-500">{formatPercentPlain(d.pctCasa)}</td>
-                <td className="py-3 px-3 text-right text-xs text-zinc-500">{formatPercentPlain(d.pctDel)}</td>
+                <td className="py-3 px-3 text-right text-xs text-zinc-500">{formatPctPlain(d.pctCasa)}</td>
+                <td className="py-3 px-3 text-right text-xs text-zinc-500">{formatPctPlain(d.pctDel)}</td>
                 <td className="py-3 pl-3 text-right">
                   {d.growth !== null
-                    ? <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${d.growth >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>{formatPercent(d.growth)}</span>
+                    ? <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${d.growth >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>{formatPct(d.growth)}</span>
                     : <span className="text-zinc-300 text-sm">—</span>
                   }
                 </td>
