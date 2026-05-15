@@ -63,7 +63,7 @@ export default function KpiCard({
           </span>
         )}
         {variationLabel && <span className="text-xs text-zinc-400">{variationLabel}</span>}
-        {subtitle && !variationLabel && <span className="text-xs text-zinc-400">{subtitle}</span>}
+        {subtitle && <p className="text-xs text-zinc-400 mt-1 font-medium">{subtitle}</p>}
       </div>
     </div>
   );

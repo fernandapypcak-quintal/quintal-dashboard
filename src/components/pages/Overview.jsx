@@ -113,10 +113,10 @@ export default function Overview() {
     const recsAA   = rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia <= lastDay);
     const melhorDia = Array.from({length:7},(_,dow) => {
       const r = recsMes.filter(x => x.Dia_Semana_Num === dow);
-      const dias = new Set(r.map(x => x.Data)).size;
+      const dias = new Set(r.map(x => x.Dia)).size;
       const media = dias > 0 ? sum(r)/dias : 0;
       const rAA = recsAA.filter(x => x.Dia_Semana_Num === dow);
-      const diasAA = new Set(rAA.map(x => x.Data)).size;
+      const diasAA = new Set(rAA.map(x => x.Dia)).size;
       const mediaAA = diasAA > 0 ? sum(rAA)/diasAA : 0;
       return { dow, media, variacao: variation(media, mediaAA) };
     }).filter(d => d.media > 0).sort((a,b) => b.media-a.media)[0];
@@ -181,14 +181,18 @@ export default function Overview() {
           tooltip="Faturamento acumulado do mês atual. YoY compara com o mesmo período do ano anterior."
           variation={kpis.yoy}
           variationLabel={`YoY até dia ${periodo.lastDay}`} delay={0} />
-        <KpiCard title="Tend Fat — Casa" value={kpis.tendFatCasa} icon={Home} accent="#8C1414"
-          tooltip="Projeção do mês para o canal Casa. Mesma fórmula do Tend Fat total."
+        <KpiCard title="Casa" value={kpis.casa} icon={Home} accent="#8C1414"
+          tooltip={`Realizado Casa até dia ${periodo?.lastDay}. Tend Fat = R$${(kpis.tendFatCasa/1e6).toFixed(2).replace('.',',')}M (projeção do mês).`}
           variation={kpis.tendVsAACasa}
-          variationLabel={`vs ${periodo?.label?.split('/')[0]}/${String(periodo?.ano-1).slice(2)}`} delay={80} />
-        <KpiCard title="Tend Fat — Delivery" value={kpis.tendFatDel} icon={Truck} accent="#D9B504"
-          tooltip="Projeção do mês para o canal Delivery. Mesma fórmula do Tend Fat total."
+          variationLabel={`Tend vs ${periodo?.label?.split('/')[0]}/${String(periodo?.ano-1).slice(2)}`}
+          subtitle={`Tend Fat ${formatBRL(kpis.tendFatCasa, true)}`}
+          delay={80} />
+        <KpiCard title="Delivery" value={kpis.del} icon={Truck} accent="#D9B504"
+          tooltip={`Realizado Delivery até dia ${periodo?.lastDay}. Tend Fat = ${formatBRL(kpis.tendFatDel, true)} (projeção do mês).`}
           variation={kpis.tendVsAADel}
-          variationLabel={`vs ${periodo?.label?.split('/')[0]}/${String(periodo?.ano-1).slice(2)}`} delay={160} />
+          variationLabel={`Tend vs ${periodo?.label?.split('/')[0]}/${String(periodo?.ano-1).slice(2)}`}
+          subtitle={`Tend Fat ${formatBRL(kpis.tendFatDel, true)}`}
+          delay={160} />
         <KpiCard title="Projeção do Mês" value={kpis.tendFat} icon={Target} accent="#97A624"
           tooltip="Tend Fat = Realizado + Σ(média de cada dia da semana × dias restantes). Mesma fórmula da planilha."
           variation={kpis.tendVsAA}
