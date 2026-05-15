@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FilterProvider, useFilters } from './hooks/useFilters';
 import { MetasProvider } from './hooks/useMetas';
 import { LabelsProvider } from './hooks/useLabels';
+import { AlmocoProvider } from './hooks/useAlmoco';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import Overview from './components/pages/Overview';
@@ -43,7 +44,9 @@ export default function App() {
     <FilterProvider>
       <MetasProvider>
         <LabelsProvider>
-          <Dashboard />
+          <AlmocoProvider>
+            <Dashboard />
+          </AlmocoProvider>
         </LabelsProvider>
       </MetasProvider>
     </FilterProvider>

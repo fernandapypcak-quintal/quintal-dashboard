@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { DollarSign, Home, Truck, Target, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
+import { useAlmoco } from '../../hooks/useAlmoco';
 import { useMetas } from '../../hooks/useMetas';
 import { useLabels } from '../../hooks/useLabels';
 import KpiCard from '../ui/KpiCard';
@@ -56,6 +57,7 @@ export default function Overview() {
   const { filteredData, rawData } = useFilters();
   const { getMetaTotal } = useMetas();
   const { showLabels } = useLabels();
+  const { getAlmoco } = useAlmoco();
 
   const periodo = useMemo(() => getPeriodo(rawData), [rawData]);
   const lojas   = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
@@ -89,7 +91,14 @@ export default function Overview() {
     const tendVsAACasa = variation(tendFatCasa, totalAAFull_casa);
     const tendVsAADel  = variation(tendFatDel,  totalAAFull_del);
 
+    // Almoço
+    const recsAlmoco = getAlmoco(ano, mes);
+    const totalAlmoco = recsAlmoco.reduce((s,r) => s + r.Valor, 0);
+    const pesoAlmoco  = casa > 0 ? totalAlmoco / casa * 100 : 0;
+    const jantarCasa  = casa - totalAlmoco;
+
     return { total, casa, del, yoy, tendFat, tendVsAA,
+      totalAlmoco, pesoAlmoco, jantarCasa,
       tendFatCasa, tendFatDel, tendVsAACasa, tendVsAADel,
       pctCasa: total>0 ? casa/total*100 : 0,
       pctDel:  total>0 ? del/total*100  : 0 };
