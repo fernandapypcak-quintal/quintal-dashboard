@@ -2,80 +2,69 @@
 import { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { loadData } from '../data/loader';
 
-const FilterContext = createContext(null);
+const Ctx = createContext(null);
 
 const MESES = [
-  { num: 1, nome: 'Jan' }, { num: 2, nome: 'Fev' }, { num: 3, nome: 'Mar' },
-  { num: 4, nome: 'Abr' }, { num: 5, nome: 'Mai' }, { num: 6, nome: 'Jun' },
-  { num: 7, nome: 'Jul' }, { num: 8, nome: 'Ago' }, { num: 9, nome: 'Set' },
-  { num: 10, nome: 'Out' }, { num: 11, nome: 'Nov' }, { num: 12, nome: 'Dez' },
+  {num:1,nome:'Jan'},{num:2,nome:'Fev'},{num:3,nome:'Mar'},{num:4,nome:'Abr'},
+  {num:5,nome:'Mai'},{num:6,nome:'Jun'},{num:7,nome:'Jul'},{num:8,nome:'Ago'},
+  {num:9,nome:'Set'},{num:10,nome:'Out'},{num:11,nome:'Nov'},{num:12,nome:'Dez'},
 ];
+
+function defaultFilters() {
+  const now = new Date();
+  return {
+    lojas: new Set(),                    // vazio = todas
+    meses: new Set([now.getMonth()+1]),  // mês atual
+    canal: 'Todos',
+    ano:   String(now.getFullYear()),    // ano atual
+  };
+}
 
 export function FilterProvider({ children }) {
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
-
-  // Filters — lojas and meses are Sets (empty = "all")
-  // Default: ano atual + mês mais recente com dados
-  // Após carregar os dados, ajusta para o último mês disponível
-  const now = new Date();
-  const [filters, setFilters] = useState({
-    lojas: new Set(),
-    meses: new Set([now.getMonth() + 1]),  // mês atual
-    canal: 'Todos',
-    ano:   String(now.getFullYear()),      // ano atual
-  });
+  const [error,   setError]   = useState(null);
+  const [filters, setFilters] = useState(defaultFilters());
 
   useEffect(() => {
     loadData()
-      .then(data => { setRawData(data); setLoading(false); })
-      .catch(err  => { setError(err);   setLoading(false); });
+      .then(d => { setRawData(d); setLoading(false); })
+      .catch(e => { setError(e);  setLoading(false); });
   }, []);
 
-  const meta = useMemo(() => {
-    const lojas = [...new Set(rawData.map(r => r.Loja))].sort();
-    const anos  = [...new Set(rawData.map(r => r.Ano))].sort((a, b) => b - a);
-    return { lojas, anos, meses: MESES };
-  }, [rawData]);
+  const meta = useMemo(() => ({
+    lojas: [...new Set(rawData.map(r => r.Loja))].sort(),
+    anos:  [...new Set(rawData.map(r => r.Ano))].sort((a,b) => b-a),
+    meses: MESES,
+  }), [rawData]);
 
   const filteredData = useMemo(() => {
     const { lojas, meses, canal, ano } = filters;
     return rawData.filter(r => {
-      if (lojas.size > 0 && !lojas.has(r.Loja))           return false;
-      if (meses.size > 0 && !meses.has(r.Mes))             return false;
-      if (canal !== 'Todos' && r.Canal !== canal)           return false;
-      if (ano   !== 'Todos' && r.Ano   !== Number(ano))     return false;
+      if (lojas.size > 0 && !lojas.has(r.Loja))        return false;
+      if (meses.size > 0 && !meses.has(r.Mes))          return false;
+      if (canal !== 'Todos' && r.Canal !== canal)        return false;
+      if (ano   !== 'Todos' && r.Ano   !== Number(ano))  return false;
       return true;
     });
   }, [rawData, filters]);
 
-  const updateFilter = (key, value) =>
-    setFilters(prev => ({ ...prev, [key]: value }));
-
-  const resetFilters = () => {
-    const n = new Date();
-    setFilters({ lojas: new Set(), meses: new Set([n.getMonth()+1]), canal: 'Todos', ano: String(n.getFullYear()) });
-  };
-
+  const updateFilter = (key, val) => setFilters(p => ({...p, [key]: val}));
+  const resetFilters = () => setFilters(defaultFilters());
   const hasActiveFilters =
-    filters.lojas.size > 0 ||
-    filters.meses.size > 0 ||
-    filters.canal !== 'Todos' ||
-    filters.ano   !== 'Todos';
+    filters.lojas.size > 0 || filters.meses.size > 0 ||
+    filters.canal !== 'Todos' || filters.ano !== 'Todos';
 
   return (
-    <FilterContext.Provider value={{
-      filters, filteredData, meta, updateFilter, resetFilters,
-      rawData, loading, error, hasActiveFilters,
-    }}>
+    <Ctx.Provider value={{ rawData, filteredData, filters, meta,
+      updateFilter, resetFilters, hasActiveFilters, loading, error }}>
       {children}
-    </FilterContext.Provider>
+    </Ctx.Provider>
   );
 }
 
 export function useFilters() {
-  const ctx = useContext(FilterContext);
-  if (!ctx) throw new Error('useFilters must be used within FilterProvider');
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error('useFilters fora do FilterProvider');
   return ctx;
 }

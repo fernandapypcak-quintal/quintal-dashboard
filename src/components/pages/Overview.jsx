@@ -1,10 +1,10 @@
 // src/components/pages/Overview.jsx
 import { useMemo } from 'react';
 import {
-  ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  ComposedChart, Bar, Line, BarChart, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LabelList
 } from 'recharts';
-import { DollarSign, Truck, Home, Target, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
+import { DollarSign, Home, Truck, Target, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
 import { useMetas } from '../../hooks/useMetas';
 import { useLabels } from '../../hooks/useLabels';
@@ -13,454 +13,329 @@ import { BigProgressBar } from '../ui/GoalProgress';
 import { CustomTooltip } from '../ui/ChartTooltip';
 import InfoTip from '../ui/InfoTip';
 import {
-  sumValues, getMonthlyTotals, getDOWTotals, calcVariation,
-  formatBRL, formatPercentPlain, formatPercent
+  sum, variation, monthlyTotals, dowTotals, calcTendFat, daysInMonth,
+  formatBRL, formatPct, formatPctPlain, DOW_FULL, DOW_ABREV
 } from '../../utils/formatters';
 
-const COLORS = { casa: '#97A624', delivery: '#D9B504' };
-const RADIAN = Math.PI / 180;
-const BRLk = v => v >= 1e6 ? 'R$\u00a0'+(v/1e6).toFixed(1).replace('.',',')+'M' : v >= 1e3 ? 'R$\u00a0'+(v/1e3).toFixed(0)+'k' : 'R$\u00a0'+v.toFixed(0);
-
-function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
-  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + r * Math.cos(-midAngle * RADIAN);
-  const y = cy + r * Math.sin(-midAngle * RADIAN);
-  return percent > 0.05 ? (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
-      {`${(percent * 100).toFixed(0)}%`}
-    </text>
-  ) : null;
+// ── helpers ──────────────────────────────────────────────────────
+function getPeriodo(rawData) {
+  if (!rawData.length) return null;
+  const keys = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
+  const key  = keys[keys.length - 1];
+  const recs = rawData.filter(r => r.Ano_Mes === key);
+  const [anoS, mesS] = key.split('-');
+  const ano  = Number(anoS), mes = Number(mesS);
+  const lastDay   = Math.max(...recs.map(r => r.Dia));
+  const totalDays = daysInMonth(ano, mes);
+  const label     = recs[0]?.Ano_Mes_Label || key;
+  return { key, ano, mes, lastDay, totalDays, label, isIncomplete: lastDay < totalDays };
 }
+
+const BRLk = v => v>=1e6 ? `R$\u00a0${(v/1e6).toFixed(1).replace('.',',')}M`
+                : v>=1e3 ? `R$\u00a0${(v/1e3).toFixed(0)}k`
+                : `R$\u00a0${v.toFixed(0)}`;
 
 function CLabel({ x, y, width, value, showLabels }) {
   if (!showLabels || !value) return null;
-  return <text x={(x||0)+(width||0)/2} y={(y||0)-5} textAnchor="middle" fontSize={10} fontWeight={500} fill="#52525B" fontFamily="DM Sans">{BRLk(value)}</text>;
+  return <text x={(x||0)+(width||0)/2} y={(y||0)-5} textAnchor="middle"
+    fontSize={10} fontWeight={500} fill="#52525B" fontFamily="DM Sans">{BRLk(value)}</text>;
 }
 
-function daysInMonth(year, month) {
-  return new Date(year, month, 0).getDate();
-}
-
-const DOW_LABELS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
-
-
-// ── Tend Fat: realizado + projeção dias restantes por dia da semana ──────
-// Lógica idêntica à planilha de acompanhamento:
-// - Médias calculadas com TODOS os dias com dados (1 até lastDay inclusive)
-// - Projeção para os dias lastDay+1 até fim do mês
-// - Dia_Semana_Num no CSV: 0=Dom, 1=Seg...6=Sáb (igual JS getDay())
-function calcTendFat(recsAtual, lastDay, totalDays, ano, mes) {
-  if (!recsAtual.length) return 0;
-
-  // Médias por dia da semana usando TODOS os dias disponíveis
-  const mediaPorDow = {};
-  for (let dow = 0; dow < 7; dow++) {
-    const recsDow = recsAtual.filter(r => r.Dia_Semana_Num === dow);
-    const diasDow  = new Set(recsDow.map(r => r.Data)).size;
-    mediaPorDow[dow] = diasDow > 0
-      ? recsDow.reduce((s, r) => s + r.Valor, 0) / diasDow
-      : 0;
-  }
-
-  // Projeção: dias lastDay+1 até fim do mês
-  // CSV usa 0=Dom igual ao JS getDay() — sem conversão necessária
-  let projecaoRestante = 0;
-  for (let dia = lastDay + 1; dia <= totalDays; dia++) {
-    const dow = new Date(ano, mes - 1, dia).getDay();
-    projecaoRestante += mediaPorDow[dow] || 0;
-  }
-
-  const realizado = recsAtual.reduce((s, r) => s + r.Valor, 0);
-  return realizado + projecaoRestante;
+const PIE_COLORS = ['#97A624','#D9B504'];
+const RADIAN = Math.PI / 180;
+function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
+  if (percent < 0.05) return null;
+  const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+  return <text x={cx + r*Math.cos(-midAngle*RADIAN)} y={cy + r*Math.sin(-midAngle*RADIAN)}
+    fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={600}>
+    {(percent*100).toFixed(0)}%
+  </text>;
 }
 
 export default function Overview() {
   const { filteredData, rawData } = useFilters();
   const { getMetaTotal } = useMetas();
   const { showLabels } = useLabels();
-  const lojas = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
-  // ── Período atual ──────────────────────────────────────────────
-  const periodo = useMemo(() => {
-    if (!rawData.length) return null;
-    // Sempre deriva o período do rawData para garantir que ano = ano atual
-    const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
-    const latestKey = allMonths[allMonths.length - 1];
-    const [anoStr, mesStr] = latestKey.split('-');
-    const ano = Number(anoStr), mes = Number(mesStr);
-    const recsLatest = rawData.filter(r => r.Ano_Mes === latestKey);
-    const lastDay = Math.max(...recsLatest.map(r => r.Dia));
-    const isIncomplete = latestKey === allMonths[allMonths.length - 1];
-    const label = recsLatest[0]?.Ano_Mes_Label || latestKey;
-    const totalDays = daysInMonth(ano, mes);
-    return { latestKey, ano, mes, lastDay, isIncomplete, label, totalDays };
-  }, [filteredData, rawData]);
+  const periodo = useMemo(() => getPeriodo(rawData), [rawData]);
+  const lojas   = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
-  // ── KPI stats com YoY cortado ──────────────────────────────────
-  const stats = useMemo(() => {
+  // ── KPIs do mês atual — sempre usando rawData filtrado por ano atual ──
+  const kpis = useMemo(() => {
     if (!periodo) return null;
-    const { latestKey, ano, mes, lastDay, isIncomplete } = periodo;
-    // Sempre usa só o ano atual (independente do filtro de ano)
-    const anoAtualData  = filteredData.filter(r => r.Ano === ano);
-    const total = sumValues(anoAtualData);
-    const casa  = sumValues(anoAtualData.filter(r => r.Canal === 'CASA'));
-    const del   = sumValues(anoAtualData.filter(r => r.Canal === 'DELIVERY'));
+    const { key, ano, mes, lastDay, totalDays } = periodo;
 
-    // YoY mês atual (com corte)
-    const curMonthRecs  = anoAtualData.filter(r => r.Ano_Mes === latestKey);
-    const prevYearRecs  = rawData.filter(r =>
-      r.Ano === ano - 1 && r.Mes === mes &&
-      (!isIncomplete || r.Dia <= lastDay)
-    );
-    const yoyMes = calcVariation(sumValues(curMonthRecs), sumValues(prevYearRecs));
+    // Dados do mês atual (ano atual, mês atual)
+    const recsMes = rawData.filter(r => r.Ano === ano && r.Mes === mes);
+    const total   = sum(recsMes);
+    const casa    = sum(recsMes.filter(r => r.Canal === 'CASA'));
+    const del     = sum(recsMes.filter(r => r.Canal === 'DELIVERY'));
 
-    // Projeção do mês
-    const realizado   = sumValues(curMonthRecs);
-    // Dias com faturamento real (exclui dias sem registro)
-    // Usa dias fechados (exclui o dia atual, que pode estar incompleto)
-    // Tend Fat = realizado + projeção dos dias restantes por dia da semana
-    const projetado = calcTendFat(curMonthRecs, lastDay, periodo.totalDays, ano, mes);
-    const mediaDiaria = lastDay > 0 ? realizado / lastDay : 0; // só para exibição
-    const prevMesAno  = sumValues(rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes));
-    const tendVsAA    = calcVariation(projetado, prevMesAno);
+    // YoY: mês atual vs mesmo mês ano anterior, cortado no mesmo dia
+    const recsAA = rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia <= lastDay);
+    const yoy    = variation(total, sum(recsAA));
 
-    return {
-      total, casa, del, yoyMes, realizado, mediaDiaria, projetado, tendVsAA,
-      pctCasa: total > 0 ? casa / total * 100 : 0,
-      pctDel:  total > 0 ? del  / total * 100 : 0,
-    };
-  }, [filteredData, rawData, periodo]);
+    // Tend Fat
+    const tendFat  = calcTendFat(recsMes, lastDay, totalDays, ano, mes);
+    const totalAAFull = sum(rawData.filter(r => r.Ano === ano-1 && r.Mes === mes));
+    const tendVsAA = variation(tendFat, totalAAFull);
 
-  // ── Contexto do mês ────────────────────────────────────────────
+    return { total, casa, del, yoy, tendFat, tendVsAA,
+      pctCasa: total>0 ? casa/total*100 : 0,
+      pctDel:  total>0 ? del/total*100  : 0 };
+  }, [rawData, periodo]);
+
+  // ── Contexto do mês ──────────────────────────────────────────────
   const contexto = useMemo(() => {
-    if (!periodo || !stats) return null;
-    const { lastDay, totalDays, ano, mes, latestKey } = periodo;
+    if (!periodo || !kpis) return null;
+    const { key, ano, mes, lastDay, totalDays } = periodo;
     const diasRestantes = totalDays - lastDay;
     const pctMes = lastDay / totalDays * 100;
 
-    // Meta
-    const meta = getMetaTotal(latestKey, lojas);
-    const faltaMeta = meta > 0 ? meta - stats.realizado : null;
+    const meta = getMetaTotal(key, lojas);
+    const faltaMeta = meta > 0 ? meta - kpis.total : null;
     const necessarioPorDia = faltaMeta !== null && diasRestantes > 0
       ? faltaMeta / diasRestantes : null;
+    const mediaDiariaAtual = lastDay > 0 ? kpis.total / lastDay : 0;
 
-    // Melhor dia da semana no mês atual vs ano anterior
-    const recsAtual = filteredData.filter(r => r.Ano_Mes === latestKey);
-    const recsAnt   = rawData.filter(r => r.Ano === ano - 1 && r.Mes === mes && r.Dia <= lastDay);
+    // Melhor dia da semana
+    const recsMes  = rawData.filter(r => r.Ano === ano && r.Mes === mes);
+    const recsAA   = rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia <= lastDay);
+    const melhorDia = Array.from({length:7},(_,dow) => {
+      const r = recsMes.filter(x => x.Dia_Semana_Num === dow);
+      const dias = new Set(r.map(x => x.Data)).size;
+      const media = dias > 0 ? sum(r)/dias : 0;
+      const rAA = recsAA.filter(x => x.Dia_Semana_Num === dow);
+      const diasAA = new Set(rAA.map(x => x.Data)).size;
+      const mediaAA = diasAA > 0 ? sum(rAA)/diasAA : 0;
+      return { dow, media, variacao: variation(media, mediaAA) };
+    }).filter(d => d.media > 0).sort((a,b) => b.media-a.media)[0];
 
-    const dowStats = DOW_LABELS.map((label, idx) => {
-      const cur  = recsAtual.filter(r => r.Dia_Semana_Num === idx);
-      const prev = recsAnt.filter(r => r.Dia_Semana_Num === idx);
-      const diasCur  = [...new Set(cur.map(r => r.Data))].length;
-      const diasPrev = [...new Set(prev.map(r => r.Data))].length;
-      const mediaCur  = diasCur  > 0 ? sumValues(cur)  / diasCur  : 0;
-      const mediaPrev = diasPrev > 0 ? sumValues(prev) / diasPrev : 0;
-      const variacao  = calcVariation(mediaCur, mediaPrev);
-      return { label, mediaCur, mediaPrev, variacao };
-    }).filter(d => d.mediaCur > 0);
+    return { diasRestantes, pctMes, meta, necessarioPorDia, mediaDiariaAtual, melhorDia };
+  }, [periodo, kpis, rawData, lojas, getMetaTotal]);
 
-    const melhorDia = [...dowStats].sort((a, b) => b.mediaCur - a.mediaCur)[0];
-
-    return {
-      diasRestantes, pctMes, meta, faltaMeta,
-      necessarioPorDia, mediaDiariaAtual: stats.mediaDiaria,
-      melhorDia,
-    };
-  }, [periodo, stats, filteredData, rawData, lojas, getMetaTotal]);
-
-  // ── Gráfico: barras do ano atual + linha do ano anterior ────────
-  // Mostra APENAS o ano atual (ou o filtrado), com linha do mesmo
-  // período no ano anterior — sem misturar os dois anos nas barras.
+  // ── Gráfico mensal: barras ano atual + linha ano anterior ─────────
   const chartData = useMemo(() => {
     if (!periodo) return [];
-
-    // Determina qual ano mostrar nas barras
-    // Se filtro de ano ativo: usa esse ano. Senão: ano mais recente com dados.
-    const anos = [...new Set(filteredData.map(r => r.Ano))].sort();
-    const anoAtual = anos[anos.length - 1];
-    const anoAnt   = anoAtual - 1;
-
-    // Meses do ano atual presentes nos dados filtrados
-    const mesesAnoAtual = getMonthlyTotals(
-      filteredData.filter(r => r.Ano === anoAtual)
-    );
-
-    return mesesAnoAtual.map(m => {
-      // Mesmo mês no ano anterior (com corte se incompleto)
-      const prevRecs = rawData.filter(r => r.Ano === anoAnt && r.Mes === m.mes);
-      const hasPrev  = prevRecs.length > 0;
-      const prevValue = !hasPrev
-        ? null
-        : (periodo.isIncomplete && m.key === periodo.latestKey)
-          ? sumValues(rawData.filter(r =>
-              r.Ano === anoAnt && r.Mes === m.mes && r.Dia <= periodo.lastDay
-            ))
-          : sumValues(prevRecs);
-      return { ...m, prevYear: prevValue };
+    const { ano } = periodo;
+    const cur = monthlyTotals(rawData.filter(r => r.Ano === ano));
+    return cur.map(m => {
+      const prev = rawData.filter(r => r.Ano === ano-1 && r.Mes === m.mes);
+      // Linha do ano anterior: só mostra se tem dados reais
+      const prevVal = prev.length > 0
+        ? (m.key === periodo.key
+          ? sum(prev.filter(r => r.Dia <= periodo.lastDay)) // corte no mês atual
+          : sum(prev))
+        : null;
+      return { ...m, prevYear: prevVal };
     });
-  }, [filteredData, rawData, periodo]);
+  }, [rawData, periodo]);
 
-  const dowData = useMemo(() => getDOWTotals(filteredData), [filteredData]);
+  // ── DOW e meta ───────────────────────────────────────────────────
+  const dowData = useMemo(() => {
+    if (!periodo) return [];
+    const { ano, mes } = periodo;
+    return dowTotals(rawData.filter(r => r.Ano === ano && r.Mes === mes));
+  }, [rawData, periodo]);
+
+  const metaProgresso = useMemo(() => {
+    if (!periodo) return null;
+    const meta = getMetaTotal(periodo.key, lojas);
+    if (!meta) return null;
+    const real = sum(rawData.filter(r => r.Ano === periodo.ano && r.Mes === periodo.mes));
+    return { meta, real, label: periodo.label };
+  }, [periodo, lojas, getMetaTotal, rawData]);
 
   const pieData = [
-    { name: 'Casa',     value: stats?.casa  || 0 },
-    { name: 'Delivery', value: stats?.del   || 0 },
+    { name: 'Casa',     value: kpis?.casa || 0 },
+    { name: 'Delivery', value: kpis?.del  || 0 },
   ];
 
-  const metaMesAtual = useMemo(() => {
-    if (!periodo) return null;
-    const meta = getMetaTotal(periodo.latestKey, lojas);
-    if (!meta) return null;
-    const real = sumValues(filteredData.filter(r => r.Ano_Mes === periodo.latestKey));
-    return { meta, real, label: periodo.label };
-  }, [periodo, lojas, getMetaTotal, filteredData]);
-
-  if (!stats || !periodo) return null;
+  if (!periodo || !kpis) return null;
 
   return (
     <div className="p-6 space-y-5 animate-fade-in">
 
-      {/* Aviso de corte */}
+      {/* Aviso */}
       {periodo.isIncomplete && (
         <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
-          <Calendar size={13} className="flex-shrink-0" />
-          <span>
-            <strong>{periodo.label}</strong> incompleto — comparações YoY cortadas no dia <strong>{periodo.lastDay}</strong> para análise justa.
-          </span>
+          <Calendar size={13} className="flex-shrink-0"/>
+          <span><strong>{periodo.label}</strong> — dados até dia <strong>{periodo.lastDay}</strong>.
+          YoY e Tend Fat calculados com base nesse período.</span>
         </div>
       )}
 
-      {/* ── 4 KPIs ── */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Faturamento Total"
-          value={stats.total}
-          icon={DollarSign}
-          accent="#97A624"
-          tooltip="Soma do faturamento no período filtrado. A variação YoY compara com o mesmo mês do ano anterior, cortada no mesmo dia para análise justa."
-          variation={stats.yoyMes}
-          variationLabel={periodo.isIncomplete ? `YoY até dia ${periodo.lastDay}` : 'vs mesmo mês ano ant.'}
-          delay={0}
-        />
-        <KpiCard
-          title="Casa"
-          value={stats.casa}
-          icon={Home}
-          accent="#8C1414"
-          tooltip="Faturamento gerado pelo canal CASA (consumo no local) no período filtrado."
-          subtitle={`${formatPercentPlain(stats.pctCasa)} do total`}
-          delay={80}
-        />
-        <KpiCard
-          title="Delivery"
-          value={stats.del}
-          icon={Truck}
-          accent="#D9B504"
-          tooltip="Faturamento gerado pelo canal DELIVERY no período filtrado."
-          subtitle={`${formatPercentPlain(stats.pctDel)} do total`}
-          delay={160}
-        />
-        <KpiCard
-          title="Projeção do Mês"
-          value={stats.projetado}
-          icon={Target}
-          accent="#97A624"
-          tooltip="Tend Fat: média diária × dias do mês. Mostra como o mês deve fechar mantendo o ritmo atual. Tend vs AA = variação vs mesmo mês do ano passado (completo)."
-          variation={stats.tendVsAA}
-          variationLabel={`vs ${periodo.label.split('/')[0]}/${String(periodo.ano - 1).slice(2)}`}
-          delay={240}
-        />
+        <KpiCard title="Faturamento Total" value={kpis.total} icon={DollarSign} accent="#97A624"
+          tooltip="Faturamento acumulado do mês atual. YoY compara com o mesmo período do ano anterior."
+          variation={kpis.yoy}
+          variationLabel={`YoY até dia ${periodo.lastDay}`} delay={0} />
+        <KpiCard title="Casa" value={kpis.casa} icon={Home} accent="#8C1414"
+          tooltip="Faturamento do canal Casa no mês atual."
+          subtitle={`${formatPctPlain(kpis.pctCasa)} do total`} delay={80} />
+        <KpiCard title="Delivery" value={kpis.del} icon={Truck} accent="#D9B504"
+          tooltip="Faturamento do canal Delivery no mês atual."
+          subtitle={`${formatPctPlain(kpis.pctDel)} do total`} delay={160} />
+        <KpiCard title="Projeção do Mês" value={kpis.tendFat} icon={Target} accent="#97A624"
+          tooltip="Tend Fat = Realizado + Σ(média de cada dia da semana × dias restantes). Mesma fórmula da planilha."
+          variation={kpis.tendVsAA}
+          variationLabel={`vs ${periodo.label.split('/')[0]}/${String(periodo.ano-1).slice(2)}`} delay={240} />
       </div>
 
-      {/* ── Contexto do mês ── */}
+      {/* Contexto do mês */}
       {contexto && (
-        <div
-          className="bg-white border border-surface-border rounded-2xl p-5 animate-slide-up"
-          style={{ animationDelay: '100ms', animationFillMode: 'both' }}
-        >
+        <div className="bg-white border border-surface-border rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Calendar size={14} className="text-zinc-400" />
+              <Calendar size={14} className="text-zinc-400"/>
               <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                Contexto do mês — {periodo.label}
+                Contexto — {periodo.label}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              {/* Progress bar do mês */}
               <div className="w-24 h-1.5 bg-surface-muted rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-brand-olive transition-all duration-700"
-                  style={{ width: `${contexto.pctMes.toFixed(1)}%` }} />
+                <div className="h-full rounded-full bg-brand-olive"
+                  style={{ width: `${contexto.pctMes.toFixed(0)}%` }} />
               </div>
-              <span className="text-xs text-zinc-400">
-                dia {periodo.lastDay} de {periodo.totalDays} ({contexto.pctMes.toFixed(0)}%)
-              </span>
+              <span className="text-xs text-zinc-400">dia {periodo.lastDay} de {periodo.totalDays} ({contexto.pctMes.toFixed(0)}%)</span>
             </div>
           </div>
-
           <div className="grid grid-cols-3 gap-3">
-            {/* Dias restantes */}
             <div className="bg-surface-muted rounded-xl p-4">
-              <div className="flex items-center gap-1 mb-2"><p className="text-xs text-zinc-400">Dias restantes</p><InfoTip text="Dias que faltam até o fim do mês, contando a partir do último dia com dados registrados." /></div>
+              <div className="flex items-center gap-1 mb-2">
+                <p className="text-xs text-zinc-400">Dias restantes</p>
+                <InfoTip text="Dias que faltam até o fim do mês." />
+              </div>
               <p className="text-2xl font-bold font-display text-brand-black">{contexto.diasRestantes}</p>
               <p className="text-xs text-zinc-400 mt-1">até o fim do mês</p>
             </div>
-
-            {/* Necessário por dia para meta */}
             <div className="bg-surface-muted rounded-xl p-4">
-              <div className="flex items-center gap-1 mb-2"><p className="text-xs text-zinc-400">Necessário p/ meta</p><InfoTip text="Quanto precisa faturar por dia para atingir a meta. Cálculo: (Meta - Realizado) ÷ Dias restantes. Comparado com o ritmo diário atual." /></div>
+              <div className="flex items-center gap-1 mb-2">
+                <p className="text-xs text-zinc-400">Necessário p/ meta</p>
+                <InfoTip text="(Meta − Realizado) ÷ Dias restantes. Comparado com o ritmo diário atual." />
+              </div>
               {contexto.necessarioPorDia !== null ? (
                 <>
                   <p className="text-xl font-bold font-display text-brand-black">
                     {formatBRL(contexto.necessarioPorDia, true)}<span className="text-sm font-normal text-zinc-400">/dia</span>
                   </p>
-                  <div className={`flex items-center gap-1 mt-1.5 text-xs font-semibold ${
-                    contexto.mediaDiariaAtual >= contexto.necessarioPorDia ? 'text-emerald-600' : 'text-rose-600'
-                  }`}>
-                    {contexto.mediaDiariaAtual >= contexto.necessarioPorDia
-                      ? <TrendingUp size={11}/>
-                      : <TrendingDown size={11}/>
-                    }
+                  <div className={`flex items-center gap-1 mt-1.5 text-xs font-semibold ${contexto.mediaDiariaAtual >= contexto.necessarioPorDia ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {contexto.mediaDiariaAtual >= contexto.necessarioPorDia ? <TrendingUp size={11}/> : <TrendingDown size={11}/>}
                     ritmo atual {formatBRL(contexto.mediaDiariaAtual, true)}/dia
                   </div>
                 </>
-              ) : (
-                <p className="text-sm text-zinc-400">Meta não definida</p>
-              )}
+              ) : <p className="text-sm text-zinc-400 mt-1">Meta não definida</p>}
             </div>
-
-            {/* Melhor dia da semana */}
             <div className="bg-surface-muted rounded-xl p-4">
-              <div className="flex items-center gap-1 mb-2"><p className="text-xs text-zinc-400">Melhor dia do mês</p><InfoTip text="Dia da semana com maior média de faturamento no mês atual. Mostra em qual dia a operação performa melhor." /></div>
+              <div className="flex items-center gap-1 mb-2">
+                <p className="text-xs text-zinc-400">Melhor dia do mês</p>
+                <InfoTip text="Dia da semana com maior média de faturamento no mês atual." />
+              </div>
               {contexto.melhorDia ? (
                 <>
                   <p className="text-xl font-bold font-display text-brand-black">
-                    {contexto.melhorDia.label}
+                    {DOW_FULL[contexto.melhorDia.dow]}
                   </p>
                   <div className="flex items-center gap-1 mt-1.5">
                     <span className="text-xs text-zinc-400">média</span>
-                    <span className="text-xs font-semibold text-brand-black">
-                      {formatBRL(contexto.melhorDia.mediaCur, true)}
-                    </span>
+                    <span className="text-xs font-semibold text-brand-black">{formatBRL(contexto.melhorDia.media, true)}</span>
                     {contexto.melhorDia.variacao !== null && (
-                      <span className={`text-xs font-semibold ml-1 ${
-                        contexto.melhorDia.variacao >= 0 ? 'text-emerald-600' : 'text-rose-600'
-                      }`}>
-                        {contexto.melhorDia.variacao >= 0 ? '▲' : '▼'} {Math.abs(contexto.melhorDia.variacao).toFixed(1).replace('.', ',')}% YoY
+                      <span className={`text-xs font-semibold ml-1 ${contexto.melhorDia.variacao >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {contexto.melhorDia.variacao >= 0 ? '▲' : '▼'} {Math.abs(contexto.melhorDia.variacao).toFixed(1).replace('.',',')}% YoY
                       </span>
                     )}
                   </div>
                 </>
-              ) : (
-                <p className="text-sm text-zinc-400">Sem dados</p>
-              )}
+              ) : <p className="text-sm text-zinc-400">Sem dados</p>}
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Meta ── */}
-      {metaMesAtual && (
-        <BigProgressBar
-          label={`Meta — ${metaMesAtual.label}`}
-          sublabel="Progresso do mês mais recente"
-          realizado={metaMesAtual.real}
-          meta={metaMesAtual.meta}
-          delay={150}
-        />
+      {/* Meta */}
+      {metaProgresso && (
+        <BigProgressBar label={`Meta — ${metaProgresso.label}`}
+          sublabel="Progresso do mês" realizado={metaProgresso.real} meta={metaProgresso.meta} delay={150} />
       )}
 
-      {/* ── Gráfico: barras mensais + linha ano anterior ── */}
-      <div className="chart-card animate-slide-up" style={{ animationDelay: '120ms', animationFillMode: 'both' }}>
+      {/* Gráfico mensal */}
+      <div className="chart-card">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <div>
             <h3 className="section-title">Faturamento Mensal</h3>
-            <p className="text-xs text-zinc-400 mt-0.5">Barras = atual · Linha = mesmo mês ano anterior</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Barras = {periodo.ano} · Linha = {periodo.ano-1}</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-              <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#97A624' }} />Casa
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-              <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: '#D9B504' }} />Delivery
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-zinc-500">
-              <span className="w-4 h-0.5 inline-block" style={{ backgroundColor: '#8C1414', borderTop: '2px dashed #8C1414' }} />Ano ant.
-            </div>
+          <div className="flex items-center gap-4 text-xs text-zinc-500">
+            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block" style={{background:'#97A624'}}/>Casa</div>
+            <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block" style={{background:'#D9B504'}}/>Delivery</div>
+            <div className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed inline-block" style={{borderColor:'#8C1414'}}/>Ano ant.</div>
           </div>
         </div>
         <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={chartData} margin={{ top: 12, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#F0F0EC" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#A1A1AA' }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={v => formatBRL(v, true)} tick={{ fontSize: 11, fill: '#A1A1AA' }} axisLine={false} tickLine={false} width={76} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="casa"     name="Casa"     fill="#97A624" radius={[0,0,0,0]} stackId="a" maxBarSize={36}>
-              <LabelList content={props => <CLabel {...props} showLabels={showLabels} />} />
+          <ComposedChart data={chartData} margin={{top:12,right:4,left:0,bottom:0}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#F0F0EC" vertical={false}/>
+            <XAxis dataKey="label" tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false}/>
+            <YAxis tickFormatter={v=>formatBRL(v,true)} tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false} width={76}/>
+            <Tooltip content={<CustomTooltip/>}/>
+            <Bar dataKey="casa"     name="Casa"     fill="#97A624" stackId="a" radius={[0,0,0,0]} maxBarSize={40}>
+              <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
             </Bar>
-            <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[3,3,0,0]} stackId="a" maxBarSize={36}>
-              <LabelList content={props => <CLabel {...props} showLabels={showLabels} />} />
+            <Bar dataKey="delivery" name="Delivery" fill="#D9B504" stackId="a" radius={[3,3,0,0]} maxBarSize={40}>
+              <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
             </Bar>
-            <Line
-              type="monotone"
-              dataKey="prevYear"
-              name="Ano anterior"
-              stroke="#8C1414"
-              strokeWidth={2}
-              strokeDasharray="5 4"
-              dot={false}
-              activeDot={{ r: 4, strokeWidth: 0 }}
-            />
+            <Line type="monotone" dataKey="prevYear" name="Ano anterior"
+              stroke="#8C1414" strokeWidth={2} strokeDasharray="5 4" dot={false}
+              activeDot={{r:4,strokeWidth:0}} connectNulls={false}/>
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* ── Dia da semana + Mix canal ── */}
+      {/* DOW + Mix */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="chart-card lg:col-span-2 animate-slide-up" style={{ animationDelay: '200ms', animationFillMode: 'both' }}>
+        <div className="chart-card lg:col-span-2">
           <h3 className="section-title mb-1">Por Dia da Semana</h3>
-          <p className="text-xs text-zinc-400 mb-5">Volume acumulado por dia</p>
+          <p className="text-xs text-zinc-400 mb-5">Volume acumulado — {periodo.label}</p>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={dowData} margin={{ top: 12, right: 4, left: 0, bottom: 0 }} barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0EC" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#A1A1AA' }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={v => formatBRL(v, true)} tick={{ fontSize: 11, fill: '#A1A1AA' }} axisLine={false} tickLine={false} width={76} />
-              <Tooltip content={<CustomTooltip />} />
+            <BarChart data={dowData} margin={{top:12,right:4,left:0,bottom:0}} barGap={2}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0EC" vertical={false}/>
+              <XAxis dataKey="label" tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>formatBRL(v,true)} tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false} width={76}/>
+              <Tooltip content={<CustomTooltip/>}/>
               <Bar dataKey="casa"     name="Casa"     fill="#97A624" radius={[4,4,0,0]} maxBarSize={32}>
-                <LabelList content={props => <CLabel {...props} showLabels={showLabels} />} />
+                <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
               </Bar>
               <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[4,4,0,0]} maxBarSize={32}>
-                <LabelList content={props => <CLabel {...props} showLabels={showLabels} />} />
+                <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
-
-        <div className="chart-card flex flex-col animate-slide-up" style={{ animationDelay: '260ms', animationFillMode: 'both' }}>
+        <div className="chart-card flex flex-col">
           <h3 className="section-title mb-1">Mix de Canal</h3>
-          <p className="text-xs text-zinc-400 mb-3">Participação % por canal</p>
+          <p className="text-xs text-zinc-400 mb-3">Participação % — {periodo.label}</p>
           <div className="flex-1 flex items-center justify-center">
             <ResponsiveContainer width="100%" height={170}>
               <PieChart>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={76}
                   paddingAngle={3} dataKey="value" labelLine={false} label={PieLabel}>
-                  <Cell fill={COLORS.casa} />
-                  <Cell fill={COLORS.delivery} />
+                  {pieData.map((_,i)=><Cell key={i} fill={PIE_COLORS[i]}/>)}
                 </Pie>
-                <Tooltip formatter={v => formatBRL(v, true)} />
+                <Tooltip formatter={v=>formatBRL(v,true)}/>
               </PieChart>
             </ResponsiveContainer>
           </div>
           <div className="space-y-2 mt-2">
-            {pieData.map((item, i) => (
-              <div key={item.name} className="flex items-center justify-between">
+            {pieData.map((d,i)=>(
+              <div key={d.name} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: i === 0 ? COLORS.casa : COLORS.delivery }} />
-                  <span className="text-xs text-zinc-600">{item.name}</span>
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{background:PIE_COLORS[i]}}/>
+                  <span className="text-xs text-zinc-600">{d.name}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs font-semibold text-brand-black">{formatBRL(item.value, true)}</span>
+                  <span className="text-xs font-semibold text-brand-black">{formatBRL(d.value,true)}</span>
                   <span className="text-xs text-zinc-400 ml-1.5">
-                    {stats.total > 0 ? formatPercentPlain(item.value / stats.total * 100) : '0%'}
+                    {kpis.total>0 ? formatPctPlain(d.value/kpis.total*100) : '0%'}
                   </span>
                 </div>
               </div>
