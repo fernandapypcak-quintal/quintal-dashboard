@@ -166,6 +166,61 @@ export default function Overview() {
     return dowTotals(baseData.filter(r => r.Ano === ano && r.Mes === mes));
   }, [rawData, periodo]);
 
+  // ── Dados gerais do almoço ────────────────────────────────────
+  const almocoData = useMemo(() => {
+    if (!periodo) return null;
+    const { ano, mes, key, lastDay, totalDays } = periodo;
+
+    // Mês atual
+    const recsAlmoco = getAlmoco(ano, mes);
+    const totalAlmoco = recsAlmoco.reduce((s,r) => s+r.Valor, 0);
+    if (totalAlmoco === 0) return null;
+
+    const casaMes = sum(baseData.filter(r => r.Ano === ano && r.Mes === mes && r.Canal === 'CASA'));
+    const pesoAlmoco = casaMes > 0 ? totalAlmoco/casaMes*100 : 0;
+
+    // Tend Fat almoço
+    const recsAlmocoDow = recsAlmoco.map(r => ({
+      ...r, Canal: 'CASA',
+      Dia_Semana_Num: new Date(r.Data).getDay(),
+    }));
+    const tendAlmoco = calcTendFat(recsAlmocoDow, lastDay, totalDays, ano, mes);
+
+    // Evolução mensal (todos os meses com dados de almoço)
+    const { almoco: todosAlmoco } = { almoco: [] };
+    // Usa diretamente o hook
+    const evolucao = {};
+    getAlmoco && [1,2,3,4,5,6,7,8,9,10,11,12].forEach(m => {
+      const v = getAlmoco(ano, m).reduce((s,r) => s+r.Valor, 0);
+      if (v > 0 || m <= mes) {
+        const MESES = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        evolucao[`${MESES[m]}/${String(ano).slice(2)}`] = v;
+      }
+    });
+
+    // Por loja
+    const lojasAlmoco = [...new Set(recsAlmoco.map(r => r.Loja))].sort();
+    const porLoja = lojasAlmoco.map(loja => {
+      const vAlmoco = recsAlmoco.filter(r => r.Loja === loja).reduce((s,r) => s+r.Valor, 0);
+      const vCasa   = baseData.filter(r => r.Ano_Mes === key && r.Loja === loja && r.Canal === 'CASA').reduce((s,r) => s+r.Valor, 0);
+      // Data de início desta loja
+      const { almoco: allAlmoco } = { almoco: [] };
+      const inicio = getAlmoco && (() => {
+        for (let m2 = 1; m2 <= mes; m2++) {
+          const recs = getAlmoco(ano, m2).filter(r => r.Loja === loja);
+          if (recs.length) {
+            const dias = recs.map(r => r.Data).sort();
+            return dias[0];
+          }
+        }
+        return null;
+      })();
+      return { loja, vAlmoco, vCasa, peso: vCasa>0?vAlmoco/vCasa*100:0, inicio };
+    }).sort((a,b) => b.vAlmoco - a.vAlmoco);
+
+    return { totalAlmoco, pesoAlmoco, tendAlmoco, evolucao, porLoja, nLojas: lojasAlmoco.length };
+  }, [periodo, getAlmoco, baseData]);
+
   const metaProgresso = useMemo(() => {
     if (!periodo) return null;
     const meta = getMetaTotal(periodo.key, lojas);
@@ -217,39 +272,95 @@ export default function Overview() {
           variationLabel={`vs ${periodo.label.split('/')[0]}/${String(periodo.ano-1).slice(2)}`} delay={240} />
       </div>
 
-      {/* Almoço — só aparece se houver dados */}
-      {kpis.totalAlmoco > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <KpiCard title="Almoço — Total" value={kpis.totalAlmoco} icon={Home} accent="#0D9488"
-            tooltip="Faturamento total do almoço nas casas no mês atual."
-            subtitle={`${kpis.pesoAlmoco.toFixed(1).replace('.',',')}% do faturamento Casa`} delay={0} />
-          <KpiCard title="Jantar Casa" value={kpis.jantarCasa} icon={Home} accent="#8C1414"
-            tooltip="Faturamento Casa excluindo o almoço. Casa total − Almoço."
-            subtitle={`${(100-kpis.pesoAlmoco).toFixed(1).replace('.',',')}% do faturamento Casa`} delay={80} />
-          <div className="bg-white border border-surface-border rounded-2xl p-5">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-              Peso do Almoço por Loja
-            </p>
-            <div className="space-y-2">
-              {[...new Set(getAlmoco(periodo.ano, periodo.mes).map(r => r.Loja))].sort().map(loja => {
-                const vAlmoco = getAlmoco(periodo.ano, periodo.mes)
-                  .filter(r => r.Loja === loja).reduce((s,r) => s+r.Valor, 0);
-                const vCasa = rawData.filter(r =>
-                  r.Ano_Mes === periodo.key && r.Loja === loja && r.Canal === 'CASA'
-                ).reduce((s,r) => s+r.Valor, 0);
-                const peso = vCasa > 0 ? vAlmoco/vCasa*100 : 0;
-                return (
-                  <div key={loja} className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-600 truncate mr-2">{loja}</span>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <div className="w-16 h-1.5 bg-surface-muted rounded-full overflow-hidden">
-                        <div className="h-full rounded-full bg-teal-500" style={{width:`${Math.min(peso,100)}%`}}/>
+      {/* ── ALMOÇO ── */}
+      {almocoData && (
+        <div className="bg-white border border-surface-border rounded-2xl p-5">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-1 h-5 rounded-full bg-teal-500 flex-shrink-0"/>
+            <h3 className="section-title">Almoço — {periodo.label}</h3>
+            <span className="text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-2 py-0.5">
+              {almocoData.nLojas} {almocoData.nLojas === 1 ? 'loja ativa' : 'lojas ativas'}
+            </span>
+          </div>
+
+          {/* Cards resumo */}
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            <div className="bg-surface-muted rounded-xl p-3">
+              <p className="text-[11px] text-zinc-400 uppercase tracking-wider mb-1">Total almoço</p>
+              <p className="text-xl font-bold font-display text-teal-600">{formatBRL(almocoData.totalAlmoco, true)}</p>
+            </div>
+            <div className="bg-surface-muted rounded-xl p-3">
+              <p className="text-[11px] text-zinc-400 uppercase tracking-wider mb-1">Peso no Casa</p>
+              <p className="text-xl font-bold font-display text-brand-black">{almocoData.pesoAlmoco.toFixed(1).replace('.',',')}%</p>
+            </div>
+            <div className="bg-surface-muted rounded-xl p-3">
+              <p className="text-[11px] text-zinc-400 uppercase tracking-wider mb-1">Tend Fat almoço</p>
+              <p className="text-xl font-bold font-display text-brand-black">{formatBRL(almocoData.tendAlmoco, true)}</p>
+            </div>
+          </div>
+
+          {/* Gráfico + Ranking */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+            {/* Evolução mensal */}
+            <div>
+              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Crescimento mensal</p>
+              <div className="flex items-end gap-2 h-20">
+                {Object.entries(almocoData.evolucao).map(([label, val]) => {
+                  const maxVal = Math.max(...Object.values(almocoData.evolucao));
+                  const pct = maxVal > 0 ? val/maxVal : 0;
+                  const isCur = label === periodo.label;
+                  return (
+                    <div key={label} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full rounded-t flex items-end justify-center"
+                        style={{height:'64px'}}>
+                        <div className="w-full rounded-t-lg transition-all"
+                          style={{
+                            height: `${Math.max(pct*100,val>0?8:2)}%`,
+                            background: val === 0 ? '#E4E4E0' : isCur ? '#0D9488' : '#5ECEBD',
+                            opacity: val === 0 ? 0.4 : 1,
+                          }}/>
                       </div>
-                      <span className="font-semibold text-zinc-700 w-10 text-right">{peso.toFixed(1)}%</span>
+                      <span className={`text-[10px] font-${isCur?'semibold':'normal'} ${isCur?'text-teal-600':'text-zinc-400'}`}>
+                        {label}
+                      </span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Ranking por loja */}
+            <div>
+              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Por loja</p>
+              <div className="space-y-2.5">
+                {almocoData.porLoja.map(l => {
+                  const maxVal = almocoData.porLoja[0]?.vAlmoco || 1;
+                  return (
+                    <div key={l.loja}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-zinc-700">{l.loja}</span>
+                          {l.inicio && (
+                            <span className="text-[10px] bg-teal-50 text-teal-600 border border-teal-100 rounded px-1.5 py-0.5">
+                              desde {l.inicio.split('-').slice(1).reverse().join('/')}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-zinc-700">{formatBRL(l.vAlmoco, true)}</span>
+                          <span className="text-teal-600 font-semibold w-10 text-right">{l.peso.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-surface-muted rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-teal-500"
+                          style={{width:`${l.vAlmoco/maxVal*100}%`}}/>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
