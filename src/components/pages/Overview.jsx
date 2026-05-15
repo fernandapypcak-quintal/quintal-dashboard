@@ -291,7 +291,7 @@ export default function Overview() {
               <p className="text-xl font-bold font-display text-teal-600">{formatBRL(almocoData.totalAlmoco, true)}</p>
             </div>
             <div className="bg-surface-muted rounded-xl p-3">
-              <p className="text-[11px] text-zinc-400 uppercase tracking-wider mb-1">Peso no Casa</p>
+              <p className="text-[11px] text-zinc-400 uppercase tracking-wider mb-1">Peso da Casa</p>
               <p className="text-xl font-bold font-display text-brand-black">{almocoData.pesoAlmoco.toFixed(1).replace('.',',')}%</p>
             </div>
             <div className="bg-surface-muted rounded-xl p-3">
