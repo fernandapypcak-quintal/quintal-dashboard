@@ -343,7 +343,12 @@ export default function Trend() {
                 <Cell key={i} fill={d.yoy >= 0 ? '#97A624' : '#8C1414'}
                   opacity={d.key === periodo.latestKey ? 0.8 : 1} />
               ))}
-              <LabelList content={props => <PctLabel {...props} showLabels={showLabels} />} />
+              <LabelList dataKey="yoy" content={(props) => {
+                if (!showLabels || props.value == null) return null;
+                const v = props.value;
+                const color = v >= 0 ? '#059669' : '#dc2626';
+                return <text x={(props.x||0)+(props.width||0)/2} y={v>=0?(props.y||0)-5:(props.y||0)+14} textAnchor="middle" fontSize={10} fontWeight={600} fill={color} fontFamily="DM Sans">{v>=0?'+':''}{v.toFixed(1).replace('.',',')}%</text>;
+              }} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -391,7 +396,14 @@ export default function Trend() {
               }}
             />
             <Bar dataKey="mediaPrev" name={`${periodo.ano - 1}`} fill="#E8E8E2" radius={[3,3,0,0]} maxBarSize={28} />
-            <Bar dataKey="mediaCur"  name={`${periodo.ano}`}     fill="#97A624" radius={[3,3,0,0]} maxBarSize={28} />
+            <Bar dataKey="mediaCur"  name={`${periodo.ano}`}     fill="#97A624" radius={[3,3,0,0]} maxBarSize={28}>
+              <LabelList dataKey="mediaCur" content={(p) => {
+                if (!showLabels || !p.value) return null;
+                const v = p.value;
+                const s = v>=1e6?`R$ ${(v/1e6).toFixed(1).replace('.',',')}M`:v>=1e3?`R$ ${(v/1e3).toFixed(0)}k`:`R$ ${v.toFixed(0)}`;
+                return <text x={(p.x||0)+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize={9} fontWeight={500} fill="#52525B" fontFamily="DM Sans">{s}</text>;
+              }}/>
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
         <div className="mt-5 overflow-x-auto">

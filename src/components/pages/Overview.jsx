@@ -278,11 +278,15 @@ export default function Overview() {
             <XAxis dataKey="label" tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false}/>
             <YAxis tickFormatter={v=>formatBRL(v,true)} tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false} width={76}/>
             <Tooltip content={<CustomTooltip/>}/>
-            <Bar dataKey="casa"     name="Casa"     fill="#97A624" stackId="a" radius={[0,0,0,0]} maxBarSize={40}>
-              <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
-            </Bar>
+            <Bar dataKey="casa"     name="Casa"     fill="#97A624" stackId="a" radius={[0,0,0,0]} maxBarSize={40} />
             <Bar dataKey="delivery" name="Delivery" fill="#D9B504" stackId="a" radius={[3,3,0,0]} maxBarSize={40}>
-              <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
+              <LabelList dataKey="delivery" content={(p) => {
+                if (!showLabels) return null;
+                const d = chartData[p.index];
+                if (!d) return null;
+                const total = (d.casa||0)+(d.delivery||0);
+                return <text x={p.x+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize={10} fontWeight={500} fill="#52525B" fontFamily="DM Sans">{total>=1e6?`R$\xa0${(total/1e6).toFixed(1).replace('.',',')}M`:total>=1e3?`R$\xa0${(total/1e3).toFixed(0)}k`:`R$\xa0${total.toFixed(0)}`}</text>;
+              }}/>
             </Bar>
             <Line type="monotone" dataKey="prevYear" name="Ano anterior"
               stroke="#8C1414" strokeWidth={2} strokeDasharray="5 4" dot={false}
@@ -302,11 +306,15 @@ export default function Overview() {
               <XAxis dataKey="label" tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false}/>
               <YAxis tickFormatter={v=>formatBRL(v,true)} tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false} width={76}/>
               <Tooltip content={<CustomTooltip/>}/>
-              <Bar dataKey="casa"     name="Casa"     fill="#97A624" radius={[4,4,0,0]} maxBarSize={32}>
-                <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
-              </Bar>
+              <Bar dataKey="casa"     name="Casa"     fill="#97A624" radius={[4,4,0,0]} maxBarSize={32} />
               <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[4,4,0,0]} maxBarSize={32}>
-                <LabelList content={p=><CLabel {...p} showLabels={showLabels}/>}/>
+                <LabelList dataKey="delivery" content={(p) => {
+                  if (!showLabels) return null;
+                  const d = dowData[p.index];
+                  if (!d) return null;
+                  const total = (d.casa||0)+(d.delivery||0);
+                  return <text x={p.x+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize={9} fontWeight={500} fill="#52525B" fontFamily="DM Sans">{total>=1e6?`R$\xa0${(total/1e6).toFixed(1).replace('.',',')}M`:total>=1e3?`R$\xa0${(total/1e3).toFixed(0)}k`:`R$\xa0${total.toFixed(0)}`}</text>;
+                }}/>
               </Bar>
             </BarChart>
           </ResponsiveContainer>
