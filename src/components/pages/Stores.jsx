@@ -183,7 +183,7 @@ export default function Stores() {
                   <div className="flex items-center gap-6 flex-wrap text-sm">
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>YoY (dia {periodo.lastDay})<InfoTip text="Variação % do faturamento atual vs mesmo período do ano anterior, cortado no mesmo dia para comparação justa." /></></p>
+                      <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">YoY (dia {periodo.lastDay})</p><InfoTip text="Variação % do faturamento atual vs mesmo período do ano anterior, cortado no mesmo dia para comparação justa." /></div>
                       {l.yoy !== null
                         ? <p className={`font-bold ${l.yoy >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {l.yoy >= 0 ? '▲ +' : '▼ '}{Math.abs(l.yoy).toFixed(1).replace('.', ',')}%
@@ -193,12 +193,12 @@ export default function Stores() {
                     </div>
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>Tend Fat<InfoTip text="Tendência de Faturamento: projeção do mês cheio baseada na média diária atual × dias do mês." /></></p>
+                      <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">Tend Fat</p><InfoTip text="Tendência de Faturamento: projeção do mês cheio baseada na média diária atual × dias do mês." /></div>
                       <p className="font-semibold text-zinc-700">{formatBRL(l.tendFat, true)}</p>
                     </div>
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>Tend vs AA<InfoTip text="Tendência vs Ano Anterior: variação entre a projeção (Tend Fat) e o mesmo mês completo do ano passado." /></></p>
+                      <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">Tend vs AA</p><InfoTip text="Tendência vs Ano Anterior: variação entre a projeção (Tend Fat) e o mesmo mês completo do ano passado." /></div>
                       {l.tendVsAA !== null
                         ? <p className={`font-bold ${l.tendVsAA >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                             {l.tendVsAA >= 0 ? '▲ +' : '▼ '}{Math.abs(l.tendVsAA).toFixed(1).replace('.', ',')}%
@@ -224,7 +224,7 @@ export default function Stores() {
                     )}
 
                     <div>
-                      <p className="text-[10px] text-zinc-400 uppercase tracking-wider mb-0.5"><>Share<InfoTip text="% que esta loja representa no faturamento total do período." /></></p>
+                      <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">Share</p><InfoTip text="% que esta loja representa no faturamento total do período." /></div>
                       <p className="font-semibold text-zinc-600">{l.share.toFixed(1)}%</p>
                     </div>
 
