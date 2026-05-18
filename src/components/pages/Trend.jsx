@@ -149,6 +149,42 @@ export default function Trend() {
     }).filter(m => m.yoy !== null);
   }, [baseData, periodo]);
 
+  // ── Tabela diária por loja ────────────────────────────────────────────
+  const tabelaDiaria = useMemo(() => {
+    if (!periodo) return null;
+    const { latestKey, ano, mes, lastDay } = periodo;
+
+    const lojas = [...new Set(rawData.map(r => r.Loja))].sort();
+    const recs26 = baseData.filter(r => r.Ano_Mes === latestKey);
+    const recs25 = baseData.filter(r => r.Ano === ano - 1 && r.Mes === mes && r.Dia <= lastDay);
+
+    const dias = Array.from({length: lastDay}, (_, i) => i + 1);
+
+    const rows = dias.map(dia => {
+      const d26 = recs26.filter(r => r.Dia === dia);
+      const d25 = recs25.filter(r => r.Dia === dia);
+
+      const total26 = sum(d26);
+      const total25 = sum(d25);
+
+      const porLoja = lojas.map(loja => {
+        const v26 = sum(d26.filter(r => r.Loja === loja));
+        const v25 = sum(d25.filter(r => r.Loja === loja));
+        return { loja, v26, v25, var: variation(v26, v25) };
+      });
+
+      // Dia da semana
+      const dow = new Date(ano, mes - 1, dia).getDay();
+      const DOW_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      const isWeekend = dow === 0 || dow === 6;
+
+      return { dia, dow: DOW_PT[dow], isWeekend, total26, total25,
+        varTotal: variation(total26, total25), porLoja };
+    });
+
+    return { rows, lojas };
+  }, [baseData, rawData, periodo]);
+
   if (!periodo || !mesAtual) return null;
 
   return (
@@ -458,6 +494,122 @@ export default function Trend() {
           </table>
         </div>
       </div>
+
+      {/* ── TABELA DIÁRIA POR LOJA ── */}
+      {tabelaDiaria && (
+        <div className="chart-card">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="section-title">Faturamento Diário por Loja — {periodo.label}</h3>
+            <InfoTip text={`Faturamento de cada loja por dia. Linha em cinza = mesmo dia em ${periodo.ano - 1}. % = variação YoY.`} />
+          </div>
+          <p className="text-xs text-zinc-400 mb-4">
+            {periodo.ano} vs {periodo.ano - 1} · dias 1–{periodo.lastDay}
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs" style={{minWidth: `${120 + tabelaDiaria.lojas.length * 100}px`}}>
+              <thead>
+                <tr className="border-b-2 border-surface-border">
+                  <th className="table-header text-left py-2 pr-3 sticky left-0 bg-white z-10">Dia</th>
+                  {tabelaDiaria.lojas.map(l => (
+                    <th key={l} className="table-header text-right py-2 px-2">{l.split(' ')[0]}</th>
+                  ))}
+                  <th className="table-header text-right py-2 pl-2 font-bold">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tabelaDiaria.rows.map(row => (
+                  <tr key={row.dia}
+                    className={`border-b border-surface-border/40 hover:bg-surface-muted/30 transition-colors
+                      ${row.isWeekend ? 'bg-zinc-50/60' : ''}`}>
+                    {/* Dia */}
+                    <td className="py-1.5 pr-3 sticky left-0 z-10"
+                      style={{background: row.isWeekend ? 'rgb(249,250,251)' : 'white'}}>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-brand-black w-5 text-right">{row.dia}</span>
+                        <span className={`text-[10px] ${row.isWeekend ? 'text-amber-500 font-medium' : 'text-zinc-400'}`}>
+                          {row.dow}
+                        </span>
+                      </div>
+                    </td>
+                    {/* Por loja */}
+                    {row.porLoja.map(l => (
+                      <td key={l.loja} className="py-1.5 px-2 text-right">
+                        {l.v26 > 0 ? (
+                          <div>
+                            <div className="font-mono text-zinc-700">{formatBRL(l.v26, true)}</div>
+                            {l.v25 > 0 && (
+                              <div className="flex items-center justify-end gap-1 mt-0.5">
+                                <span className="text-zinc-300">{formatBRL(l.v25, true)}</span>
+                                {l.var !== null && (
+                                  <span className={`text-[10px] font-semibold ${l.var >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    {l.var >= 0 ? '▲' : '▼'}{Math.abs(l.var).toFixed(0)}%
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : <span className="text-zinc-200">—</span>}
+                      </td>
+                    ))}
+                    {/* Total */}
+                    <td className="py-1.5 pl-2 text-right border-l border-surface-border/50">
+                      {row.total26 > 0 ? (
+                        <div>
+                          <div className="font-mono font-semibold text-brand-black">{formatBRL(row.total26, true)}</div>
+                          {row.total25 > 0 && (
+                            <div className="flex items-center justify-end gap-1 mt-0.5">
+                              <span className="text-zinc-300">{formatBRL(row.total25, true)}</span>
+                              {row.varTotal !== null && (
+                                <span className={`text-[10px] font-bold ${row.varTotal >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                  {row.varTotal >= 0 ? '▲' : '▼'}{Math.abs(row.varTotal).toFixed(0)}%
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : <span className="text-zinc-200">—</span>}
+                    </td>
+                  </tr>
+                ))}
+                {/* Totais */}
+                <tr className="border-t-2 border-surface-border bg-surface-muted/30 font-semibold">
+                  <td className="py-2 pr-3 text-xs font-bold text-zinc-500 uppercase sticky left-0 bg-surface-muted/30">Total</td>
+                  {tabelaDiaria.lojas.map(l => {
+                    const tot26 = tabelaDiaria.rows.reduce((s,r) => s + (r.porLoja.find(p=>p.loja===l)?.v26||0), 0);
+                    const tot25 = tabelaDiaria.rows.reduce((s,r) => s + (r.porLoja.find(p=>p.loja===l)?.v25||0), 0);
+                    const v = variation(tot26, tot25);
+                    return (
+                      <td key={l} className="py-2 px-2 text-right">
+                        <div className="font-mono text-brand-black">{formatBRL(tot26, true)}</div>
+                        {v !== null && (
+                          <span className={`text-[10px] font-bold ${v >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {v >= 0 ? '▲' : '▼'}{Math.abs(v).toFixed(0)}%
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="py-2 pl-2 text-right border-l border-surface-border/50">
+                    <div className="font-mono font-bold text-brand-black">
+                      {formatBRL(tabelaDiaria.rows.reduce((s,r)=>s+r.total26,0), true)}
+                    </div>
+                    {(() => {
+                      const t25 = tabelaDiaria.rows.reduce((s,r)=>s+r.total25,0);
+                      const t26 = tabelaDiaria.rows.reduce((s,r)=>s+r.total26,0);
+                      const v = variation(t26, t25);
+                      return v !== null ? (
+                        <span className={`text-[10px] font-bold ${v >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {v >= 0 ? '▲' : '▼'}{Math.abs(v).toFixed(0)}%
+                        </span>
+                      ) : null;
+                    })()}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
     </div>
   );
