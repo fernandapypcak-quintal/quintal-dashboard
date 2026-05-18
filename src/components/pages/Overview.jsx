@@ -208,13 +208,16 @@ export default function Overview() {
 
     // Evolução mensal (com filtro de loja aplicado)
     const evolucao = {};
-    getAlmoco && [1,2,3,4,5,6,7,8,9,10,11,12].forEach(m => {
-      const v = filtrarAlmoco(getAlmoco(ano, m)).reduce((s,r) => s+r.Valor, 0);
-      if (v > 0 || m <= mes) {
-        const MESES = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-        evolucao[`${MESES[m]}/${String(ano).slice(2)}`] = v;
+    const MESES_ABREV = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    // Mostra só meses com dados de almoço (não os zeros do início do ano)
+    if (getAlmoco) {
+      for (let m = 1; m <= mes; m++) {
+        const v = filtrarAlmoco(getAlmoco(ano, m)).reduce((s,r) => s+r.Valor, 0);
+        if (v > 0) {
+          evolucao[`${MESES_ABREV[m]}/${String(ano).slice(2)}`] = v;
+        }
       }
-    });
+    }
 
     // Por loja (já filtrado por filtrarAlmoco acima)
     const lojasAlmoco = [...new Set(recsAlmoco.map(r => r.Loja))].sort();
@@ -308,7 +311,7 @@ export default function Overview() {
           </div>
 
           {/* Cards resumo */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
             <div className="bg-surface-muted rounded-xl p-3">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] text-zinc-400 uppercase tracking-wider">Total almoço</p>
@@ -318,7 +321,7 @@ export default function Overview() {
             </div>
             <div className="bg-surface-muted rounded-xl p-3">
               <div className="flex items-center gap-1 mb-1">
-                <p className="text-[11px] text-zinc-400 uppercase tracking-wider">Peso no Casa</p>
+                <p className="text-[11px] text-zinc-400 uppercase tracking-wider">Peso no Salão</p>
                 <InfoTip text="% que o almoço representa no faturamento total do canal Salão. Indica a relevância do almoço dentro do serviço presencial." />
               </div>
               <p className="text-xl font-bold font-display text-brand-black">{almocoData.pesoAlmoco.toFixed(1).replace('.',',')}%</p>
@@ -329,6 +332,18 @@ export default function Overview() {
                 <InfoTip text="Projeção do faturamento do almoço para o mês cheio. Calculado com a mesma fórmula do Tend Fat: médias por dia da semana × dias restantes." />
               </div>
               <p className="text-xl font-bold font-display text-brand-black">{formatBRL(almocoData.tendAlmoco, true)}</p>
+            </div>
+            <div className="bg-surface-muted rounded-xl p-3">
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-[11px] text-zinc-400 uppercase tracking-wider">Tend Fat Salão</p>
+                <InfoTip text="Projeção do faturamento total do Salão para o mês cheio (inclui almoço + jantar)." />
+              </div>
+              <p className="text-xl font-bold font-display text-brand-black">{formatBRL(kpis?.tendFatCasa, true)}</p>
+              {kpis?.tendVsAACasa !== null && (
+                <p className={`text-xs font-semibold mt-1 ${kpis.tendVsAACasa >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {kpis.tendVsAACasa >= 0 ? '▲' : '▼'} {Math.abs(kpis.tendVsAACasa).toFixed(1).replace('.',',')}% vs {periodo?.label?.split('/')[0]}/{String(periodo?.ano-1).slice(2)}
+                </p>
+              )}
             </div>
           </div>
 
