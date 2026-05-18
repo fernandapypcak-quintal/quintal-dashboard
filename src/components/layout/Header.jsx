@@ -49,7 +49,7 @@ export default function Header({ activePage }) {
           <div className="hidden md:flex items-center gap-2">
             {/* Lojas */}
             <MultiSelect
-              label="Todas as lojas"
+              placeholder="Todas as lojas"
               options={meta.lojas.map(l => ({ value: l, label: l }))}
               selected={filters.lojas}
               onChange={s => updateFilter('lojas', s)}
