@@ -10,15 +10,13 @@ import { useAlmoco } from '../../hooks/useAlmoco';
 import { useMetas } from '../../hooks/useMetas';
 import { useLabels } from '../../hooks/useLabels';
 import { progressColor, AtingBadge } from '../ui/GoalProgress';
-import { sum, monthlyTotals, formatBRL, variation } from '../../utils/formatters';
+import { sum, monthlyTotals, formatBRL, variation, calcTendFat, daysInMonth } from '../../utils/formatters';
 import InfoTip from '../ui/InfoTip';
 
 const STORE_COLORS = ['#97A624','#D9B504','#D9CB04','#8C1414','#0D9488','#7C3AED','#EA580C','#0284C7','#65A30D','#6B7280'];
 const BRLk = v => v >= 1e6 ? 'R$\u00a0'+(v/1e6).toFixed(1).replace('.',',')+'M'
                 : v >= 1e3 ? 'R$\u00a0'+(v/1e3).toFixed(0)+'k'
                 : 'R$\u00a0'+v.toFixed(0);
-
-function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
 
 const DOW_LABELS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 
