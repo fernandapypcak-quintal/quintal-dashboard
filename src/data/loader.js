@@ -65,9 +65,14 @@ function getDataCorte() {
   return `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
 }
 
-export async function loadData() {
-  const dataCorte = getDataCorte();
-  console.log(`[loader] Corte: planilha até ${dataCorte}, ZIG a partir daí`);
+// modoAoVivo = true  → inclui dados de hoje (ZIG em tempo real)
+// modoAoVivo = false → só até ontem D-1 (padrão, dados fechados)
+export async function loadData(modoAoVivo = false) {
+  const hoje = new Date();
+  const dataHoje = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
+  const dataCorte = getDataCorte(); // ontem
+
+  console.log(`[loader] Modo: ${modoAoVivo ? '🔴 AO VIVO' : '📋 FECHADO (D-1)'} | Corte: ${dataCorte}`);
 
   // Busca planilha e ZIG em paralelo
   const [resPlanilha, resZig] = await Promise.allSettled([
@@ -81,31 +86,29 @@ export async function loadData() {
     dadosPlanilha = resPlanilha.value.dados
       .map(parseRowPlanilha)
       .filter(isValid)
-      .filter(r => r.Data < dataCorte); // só até antes do corte
-    console.log(`[loader] Planilha: ${dadosPlanilha.length} registros (até ${dataCorte})`);
-  } else {
-    console.warn('[loader] Planilha indisponível');
+      .filter(r => r.Data < dataCorte);
+    console.log(`[loader] Planilha: ${dadosPlanilha.length} registros`);
   }
 
-  // Dados da ZIG (recentes a partir do corte)
+  // Dados da ZIG
   let dadosZig = [];
   if (resZig.status === 'fulfilled' && resZig.value?.zig?.length) {
-    dadosZig = resZig.value.zig
-      .map(parseRowZig)
-      .filter(isValid)
-      .filter(r => r.Data >= dataCorte); // só a partir do corte
-    console.log(`[loader] ZIG: ${dadosZig.length} registros (desde ${dataCorte})`);
-  } else {
-    console.warn('[loader] ZIG indisponível');
+    const zigParsed = resZig.value.zig.map(parseRowZig).filter(isValid);
+    if (modoAoVivo) {
+      // Ao vivo: pega tudo da ZIG a partir do corte (inclui hoje)
+      dadosZig = zigParsed.filter(r => r.Data >= dataCorte);
+    } else {
+      // Fechado: só até ontem (exclui hoje)
+      dadosZig = zigParsed.filter(r => r.Data >= dataCorte && r.Data < dataHoje);
+    }
+    console.log(`[loader] ZIG: ${dadosZig.length} registros (${modoAoVivo ? 'ao vivo' : 'fechado'})`);
   }
 
-  // Se não tiver nenhum dado, erro
   if (!dadosPlanilha.length && !dadosZig.length) {
-    throw new Error('Sem dados disponíveis — verifique planilha e ZIG');
+    throw new Error('Sem dados disponíveis');
   }
 
-  // Mescla: planilha (histórico) + ZIG (recente)
   const total = [...dadosPlanilha, ...dadosZig];
-  console.log(`[loader] Total mesclado: ${total.length} registros`);
+  console.log(`[loader] Total: ${total.length} registros`);
   return total;
 }

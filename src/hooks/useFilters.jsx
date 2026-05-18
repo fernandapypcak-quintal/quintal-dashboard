@@ -21,16 +21,23 @@ function defaultFilters() {
 }
 
 export function FilterProvider({ children }) {
+  const [modoAoVivo, setModoAoVivo] = useState(false);
+  const [reloadKey, setReloadKey]   = useState(0);
+
+  function toggleModoAoVivo() {
+    setModoAoVivo(v => !v);
+    setReloadKey(k => k + 1); // força reload dos dados
+  }
   const [rawData, setRawData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
   const [filters, setFilters] = useState(defaultFilters());
 
   useEffect(() => {
-    loadData()
+    loadData(modoAoVivo)
       .then(d => { setRawData(d); setLoading(false); })
       .catch(e => { setError(e);  setLoading(false); });
-  }, []);
+  }, [reloadKey, modoAoVivo]);
 
   const meta = useMemo(() => ({
     lojas: [...new Set(rawData.map(r => r.Loja))].sort(),
@@ -57,7 +64,8 @@ export function FilterProvider({ children }) {
 
   return (
     <Ctx.Provider value={{ rawData, filteredData, filters, meta,
-      updateFilter, resetFilters, hasActiveFilters, loading, error }}>
+      updateFilter, resetFilters, hasActiveFilters, loading, error,
+      modoAoVivo, toggleModoAoVivo }}>
       {children}
     </Ctx.Provider>
   );

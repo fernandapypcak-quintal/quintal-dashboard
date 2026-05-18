@@ -1,6 +1,6 @@
 // src/components/layout/Header.jsx
 import { useState } from 'react';
-import { SlidersHorizontal, Tag, X, ChevronDown, Filter, Printer } from 'lucide-react';
+import { SlidersHorizontal, Tag, X, ChevronDown, Filter, Printer, Zap } from 'lucide-react';
 import PrintReport from '../pages/Print';
 import { useFilters } from '../../hooks/useFilters';
 import { useLabels } from '../../hooks/useLabels';
@@ -22,7 +22,7 @@ function today() {
 }
 
 export default function Header({ activePage }) {
-  const { filters, meta, updateFilter, resetFilters, hasActiveFilters } = useFilters();
+  const { filters, meta, updateFilter, resetFilters, hasActiveFilters, modoAoVivo, toggleModoAoVivo } = useFilters();
   const { showLabels, toggleLabels } = useLabels();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -115,6 +115,18 @@ export default function Header({ activePage }) {
                 : 'border-surface-border text-zinc-500'}`}>
             <Filter size={14}/>
             {hasActiveFilters && <span className="text-xs">Filtros</span>}
+          </button>
+
+          {/* Modo Ao Vivo / Fechado */}
+          <button
+            onClick={toggleModoAoVivo}
+            title={modoAoVivo ? 'Modo Ao Vivo — clique para voltar ao D-1' : 'Modo Fechado (D-1) — clique para ver ao vivo'}
+            className={`hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border transition-colors
+              ${modoAoVivo
+                ? 'bg-rose-500 text-white border-rose-500 animate-pulse'
+                : 'border-surface-border text-zinc-500 hover:border-zinc-400'}`}>
+            <Zap size={13} className={modoAoVivo ? 'fill-white' : ''}/>
+            <span className="hidden lg:inline">{modoAoVivo ? 'Ao Vivo' : 'D-1'}</span>
           </button>
 
           {/* Imprimir */}
@@ -227,6 +239,23 @@ export default function Header({ activePage }) {
                     {l}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Modo Ao Vivo */}
+            <div>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Modo de dados</label>
+              <div className="flex gap-2">
+                <button onClick={toggleModoAoVivo}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors
+                    ${!modoAoVivo ? 'bg-brand-black text-white border-brand-black' : 'border-surface-border text-zinc-600'}`}>
+                  Fechado (D-1)
+                </button>
+                <button onClick={toggleModoAoVivo}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium border transition-colors
+                    ${modoAoVivo ? 'bg-rose-500 text-white border-rose-500' : 'border-surface-border text-zinc-600'}`}>
+                  <Zap size={14}/> Ao Vivo
+                </button>
               </div>
             </div>
 
