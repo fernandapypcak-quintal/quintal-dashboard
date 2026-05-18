@@ -222,22 +222,21 @@ export default function Overview() {
     // Por loja (já filtrado por filtrarAlmoco acima)
     const lojasAlmoco = [...new Set(recsAlmoco.map(r => r.Loja))].sort();
     const porLoja = lojasAlmoco.map(loja => {
-      const vAlmoco = recsAlmoco.filter(r => r.Loja === loja).reduce((s,r) => s+r.Valor, 0);
-      const vCasa   = baseData.filter(r => r.Ano_Mes === key && r.Loja === loja && r.Canal === 'CASA').reduce((s,r) => s+r.Valor, 0);
-      // Data de início desta loja
-      const { almoco: allAlmoco } = { almoco: [] };
-      const inicio = getAlmoco && (() => {
-        for (let m2 = 1; m2 <= mes; m2++) {
-          const recs = getAlmoco(ano, m2).filter(r => r.Loja === loja);
-          if (recs.length) {
-            const dias = recs.map(r => r.Data).sort();
-            return dias[0];
+        const vAlmoco        = recsAlmoco.filter(r => r.Loja === loja).reduce((s,r) => s+r.Valor, 0);
+        const vCasa          = baseData.filter(r => r.Ano_Mes === key && r.Loja === loja && r.Canal === 'CASA').reduce((s,r) => s+r.Valor, 0);
+        const recsAlmocoLoja = filtrarAlmoco(getAlmoco(ano, mes)).filter(r => r.Loja === loja).map(r => ({
+          ...r, Dia_Semana_Num: r.Dia_Semana_Num !== undefined ? r.Dia_Semana_Num : new Date(r.Data).getDay(),
+        }));
+        const tendAlmocoLoja = calcTendFat(recsAlmocoLoja, lastDay, totalDays, ano, mes);
+        const inicio = getAlmoco && (() => {
+          for (let m2 = 1; m2 <= mes; m2++) {
+            const recs = getAlmoco(ano, m2).filter(r => r.Loja === loja);
+            if (recs.length) return recs.map(r => r.Data).sort()[0];
           }
-        }
-        return null;
-      })();
-      return { loja, vAlmoco, vCasa, peso: vCasa>0?vAlmoco/vCasa*100:0, inicio };
-    }).sort((a,b) => b.vAlmoco - a.vAlmoco);
+          return null;
+        })();
+        return { loja, vAlmoco, vCasa, peso: vCasa>0?vAlmoco/vCasa*100:0, inicio, tendAlmocoLoja };
+      }).sort((a,b) => b.vAlmoco - a.vAlmoco);
 
     return { totalAlmoco, pesoAlmoco, tendAlmoco, evolucao, porLoja, nLojas: lojasAlmoco.length };
   }, [periodo, getAlmoco, baseData, filters]);
@@ -251,7 +250,7 @@ export default function Overview() {
   }, [periodo, lojas, getMetaTotal, rawData]);
 
   const pieData = [
-    { name: 'CASA',     value: kpis?.casa || 0 },
+    { name: 'Salão',    value: kpis?.casa || 0 },
     { name: 'Delivery', value: kpis?.del  || 0 },
   ];
 
@@ -311,7 +310,7 @@ export default function Overview() {
           </div>
 
           {/* Cards resumo */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-3 gap-3 mb-5">
             <div className="bg-surface-muted rounded-xl p-3">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] text-zinc-400 uppercase tracking-wider">Total almoço</p>
@@ -333,18 +332,7 @@ export default function Overview() {
               </div>
               <p className="text-xl font-bold font-display text-brand-black">{formatBRL(almocoData.tendAlmoco, true)}</p>
             </div>
-            <div className="bg-surface-muted rounded-xl p-3">
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-[11px] text-zinc-400 uppercase tracking-wider">Tend Fat Salão</p>
-                <InfoTip text="Projeção do faturamento total do Salão para o mês cheio (inclui almoço + jantar)." />
-              </div>
-              <p className="text-xl font-bold font-display text-brand-black">{formatBRL(kpis?.tendFatCasa, true)}</p>
-              {kpis?.tendVsAACasa !== null && (
-                <p className={`text-xs font-semibold mt-1 ${kpis.tendVsAACasa >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                  {kpis.tendVsAACasa >= 0 ? '▲' : '▼'} {Math.abs(kpis.tendVsAACasa).toFixed(1).replace('.',',')}% vs {periodo?.label?.split('/')[0]}/{String(periodo?.ano-1).slice(2)}
-                </p>
-              )}
-            </div>
+
           </div>
 
           {/* Gráfico + Ranking */}
@@ -407,7 +395,10 @@ export default function Overview() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-zinc-700">{formatBRL(l.vAlmoco, true)}</span>
+                          <div className="text-right">
+                            <div className="font-semibold text-zinc-700">{formatBRL(l.vAlmoco, true)}</div>
+                            <div className="text-[10px] text-zinc-400 mt-0.5">Tend: <span className="text-teal-600 font-semibold">{formatBRL(l.tendAlmocoLoja, true)}</span></div>
+                          </div>
                           <span className="text-teal-600 font-semibold w-10 text-right">{l.peso.toFixed(1)}%</span>
                         </div>
                       </div>
