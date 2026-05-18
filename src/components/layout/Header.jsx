@@ -43,8 +43,8 @@ export default function Header({ activePage }) {
           onChange={e => updateFilter('canal', e.target.value)}
           className="filter-select"
         >
-          <option value="Todos">Casa + Delivery</option>
-          <option value="CASA">Casa</option>
+          <option value="Todos">Salão + Delivery</option>
+          <option value="CASA">Salão</option>
           <option value="DELIVERY">Delivery</option>
         </select>
 
