@@ -65,19 +65,16 @@ export function monthlyTotals(recs) {
 export function calcTendFat(recs, lastDay, totalDays, ano, mes) {
   if (!recs.length || lastDay >= totalDays) return sum(recs);
 
-  // Médias calculadas com dias ANTERIORES ao lastDay (strict <)
-  // Igual à fórmula da planilha: CONT.SES(...;"<"&DIA($A$1))
-  const recsParaMedia = recs.filter(r => r.Dia < lastDay);
-
-  // Média por dia da semana
+  // Médias calculadas com TODOS os dias com dados (incluindo lastDay)
+  // Dados são sempre D-1 (ontem fechado), então todos os dias são válidos
   const mediaDow = {};
   for (let dow = 0; dow < 7; dow++) {
-    const r = recsParaMedia.filter(x => x.Dia_Semana_Num === dow);
+    const r = recs.filter(x => x.Dia_Semana_Num === dow);
     const dias = new Set(r.map(x => x.Dia)).size;
     mediaDow[dow] = dias > 0 ? sum(r) / dias : 0;
   }
 
-  // Projeção
+  // Projeção: dias lastDay+1 até fim do mês
   let proj = 0;
   for (let d = lastDay + 1; d <= totalDays; d++) {
     proj += mediaDow[new Date(ano, mes-1, d).getDay()] || 0;
