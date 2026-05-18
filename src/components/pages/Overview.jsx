@@ -183,16 +183,15 @@ export default function Overview() {
     const { ano, mes, key, lastDay, totalDays } = periodo;
 
     // Aplica filtro de loja (igual ao baseData)
-    const filtrarAlmoco = (recs) => {
-      let filtered = recs;
-      // Exclui dados do dia atual e posteriores (regra D-1: só até lastDay)
-      filtered = filtered.filter(r => r.Dia <= lastDay);
+    // Não filtra por Dia aqui — o corte de lastDay é feito só no mês atual via recsAlmoco
+    const filtrarAlmoco = (recs, maxDia = 31) => {
+      const filtered = recs.filter(r => r.Dia <= maxDia);
       if (filters.lojas.size === 0) return filtered;
       return filtered.filter(r => filters.lojas.has(r.Loja));
     };
 
-    // Mês atual
-    const recsAlmoco = filtrarAlmoco(getAlmoco(ano, mes));
+    // Mês atual — corta no lastDay para não incluir hoje (pode estar incompleto)
+    const recsAlmoco = filtrarAlmoco(getAlmoco(ano, mes), lastDay);
     const totalAlmoco = recsAlmoco.reduce((s,r) => s+r.Valor, 0);
     if (totalAlmoco === 0) return null;
 
@@ -215,7 +214,9 @@ export default function Overview() {
     // Mostra só meses com dados de almoço (não os zeros do início do ano)
     if (getAlmoco) {
       for (let m = 1; m <= mes; m++) {
-        const v = filtrarAlmoco(getAlmoco(ano, m)).reduce((s,r) => s+r.Valor, 0);
+        // Para o mês atual, corta no lastDay; para meses passados, usa tudo
+        const maxDia = m === mes ? lastDay : 31;
+        const v = filtrarAlmoco(getAlmoco(ano, m), maxDia).reduce((s,r) => s+r.Valor, 0);
         if (v > 0) {
           evolucao[`${MESES_ABREV[m]}/${String(ano).slice(2)}`] = v;
         }
@@ -227,7 +228,7 @@ export default function Overview() {
     const porLoja = lojasAlmoco.map(loja => {
         const vAlmoco        = recsAlmoco.filter(r => r.Loja === loja).reduce((s,r) => s+r.Valor, 0);
         const vCasa          = baseData.filter(r => r.Ano_Mes === key && r.Loja === loja && r.Canal === 'CASA').reduce((s,r) => s+r.Valor, 0);
-        const recsAlmocoLoja = filtrarAlmoco(getAlmoco(ano, mes)).filter(r => r.Loja === loja).map(r => ({
+        const recsAlmocoLoja = filtrarAlmoco(getAlmoco(ano, mes), lastDay).filter(r => r.Loja === loja).map(r => ({
           ...r, Dia_Semana_Num: r.Dia_Semana_Num !== undefined ? r.Dia_Semana_Num : new Date(r.Data).getDay(),
         }));
         const tendAlmocoLoja = calcTendFat(recsAlmocoLoja, lastDay, totalDays, ano, mes);
