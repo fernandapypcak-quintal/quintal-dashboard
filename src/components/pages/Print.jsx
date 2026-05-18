@@ -75,11 +75,33 @@ export default function PrintReport({ onClose }) {
                t26, t25, var: variation(t26, t25) };
     });
 
+    // Dia anterior (ontem)
+    const ontem     = new Date(); ontem.setDate(ontem.getDate() - 1);
+    const diaOntem  = ontem.getDate();
+    const mesOntem  = ontem.getMonth() + 1;
+    const anoOntem  = ontem.getFullYear();
+    const recsOntem = rawData.filter(r => r.Ano === anoOntem && r.Mes === mesOntem && r.Dia === diaOntem);
+    const recsOntemAA = rawData.filter(r => r.Ano === anoOntem-1 && r.Mes === mesOntem && r.Dia === diaOntem);
+    const totalOntem   = sum(recsOntem);
+    const totalOntemAA = sum(recsOntemAA);
+    const yoyOntem     = variation(totalOntem, totalOntemAA);
+    const casaOntem    = sum(recsOntem.filter(r => r.Canal === 'CASA'));
+    const delOntem     = sum(recsOntem.filter(r => r.Canal === 'DELIVERY'));
+    const DOW_ONTEM    = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][ontem.getDay()];
+    const porLojaOntem = lojas.map(loja => {
+      const v26 = sum(recsOntem.filter(r => r.Loja === loja));
+      const v25 = sum(recsOntemAA.filter(r => r.Loja === loja));
+      return { loja, v26, v25, var: variation(v26, v25) };
+    }).filter(l => l.v26 > 0).sort((a,b) => b.v26 - a.v26);
+
     return { ano, mes, lastDay, totalDays, label: `${MESES[mes]}/${ano}`,
              total, casa, delivery, yoy, tendFat, tendVsAA,
              pctCasa: total>0?casa/total*100:0,
              pctDel:  total>0?delivery/total*100:0,
-             porLoja, dias, lojas };
+             porLoja, dias, lojas,
+             ontem: { data: ontem, dia: diaOntem, mes: mesOntem, ano: anoOntem,
+               dow: DOW_ONTEM, total: totalOntem, totalAA: totalOntemAA,
+               yoy: yoyOntem, casa: casaOntem, delivery: delOntem, porLoja: porLojaOntem } };
   }, [rawData, getMeta]);
 
   if (!data) return null;
@@ -307,6 +329,63 @@ ${(() => {
 
   return tabelaDiaria(metade1, 'A') + tabelaDiaria(metade2, 'B');
 })()}
+
+<!-- SEÇÃO 4: DIA ANTERIOR -->
+<div class="section-title page-break">4. Dia Anterior — ${data.ontem.dow}, ${data.ontem.dia}/${data.ontem.mes}/${data.ontem.ano}</div>
+
+<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+  <div class="kpi">
+    <div class="kpi-label">Faturamento total</div>
+    <div class="kpi-value">${fmt(data.ontem.total)}</div>
+    ${data.ontem.yoy !== null ? `<div class="kpi-var ${data.ontem.yoy>=0?'pos':'neg'}">${pct(data.ontem.yoy)} vs ${data.ontem.dia}/${data.ontem.mes}/${data.ontem.ano-1}</div>` : ''}
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Salão</div>
+    <div class="kpi-value">${fmt(data.ontem.casa)}</div>
+    <div class="kpi-sub">${data.ontem.total>0?(data.ontem.casa/data.ontem.total*100).toFixed(1).replace('.',',')+'%':''} do total</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Delivery</div>
+    <div class="kpi-value">${fmt(data.ontem.delivery)}</div>
+    <div class="kpi-sub">${data.ontem.total>0?(data.ontem.delivery/data.ontem.total*100).toFixed(1).replace('.',',')+'%':''} do total</div>
+  </div>
+  <div class="kpi" style="border-left:3px solid #1F3D2E">
+    <div class="kpi-label">Mesmo dia ${data.ontem.ano-1}</div>
+    <div class="kpi-value" style="color:#999;font-size:16px">${fmt(data.ontem.totalAA)}</div>
+    ${data.ontem.yoy !== null ? `<div class="kpi-var ${data.ontem.yoy>=0?'pos':'neg'}">${pct(data.ontem.yoy)}</div>` : '<div class="kpi-sub">sem dado anterior</div>'}
+  </div>
+</div>
+
+<table style="margin-top:12px">
+  <thead>
+    <tr>
+      <th style="text-align:left">Loja</th>
+      <th>${data.ontem.ano}</th>
+      <th>${data.ontem.ano-1}</th>
+      <th>Variação</th>
+      <th>Share</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${data.ontem.porLoja.map(l => `
+    <tr>
+      <td>${l.loja}</td>
+      <td style="text-align:right;font-weight:700">${fmt(l.v26)}</td>
+      <td style="text-align:right;color:#999">${l.v25>0?fmt(l.v25):'—'}</td>
+      <td style="text-align:right" class="${l.var>=0?'pos':'neg'}">${l.v25>0?pct(l.var):'—'}</td>
+      <td style="text-align:right">${data.ontem.total>0?(l.v26/data.ontem.total*100).toFixed(1).replace('.',',')+'%':'—'}</td>
+    </tr>`).join('')}
+  </tbody>
+  <tfoot>
+    <tr class="tfoot">
+      <td>TOTAL</td>
+      <td style="text-align:right">${fmt(data.ontem.total)}</td>
+      <td style="text-align:right;color:#666">${fmt(data.ontem.totalAA)}</td>
+      <td style="text-align:right" class="${data.ontem.yoy>=0?'pos':'neg'}">${pct(data.ontem.yoy)}</td>
+      <td style="text-align:right">100%</td>
+    </tr>
+  </tfoot>
+</table>
 
 <!-- FOOTER -->
 <div class="footer">
