@@ -8,6 +8,7 @@ import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import Header from './components/layout/Header';
 import Overview from './components/pages/Overview';
+import Hoje from './components/pages/Hoje';
 import Trend from './components/pages/Trend';
 import Weekly from './components/pages/Weekly';
 import Stores from './components/pages/Stores';
@@ -15,7 +16,7 @@ import History from './components/pages/History';
 import LoadingScreen, { ErrorScreen } from './components/ui/LoadingScreen';
 
 const PAGES = {
-  overview: Overview, trend: Trend,
+  hoje: Hoje, overview: Overview, trend: Trend,
   weekly: Weekly, stores: Stores, history: History,
 };
 

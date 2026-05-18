@@ -1,8 +1,9 @@
 // src/components/layout/BottomNav.jsx
 // Navegação inferior para mobile
-import { LayoutDashboard, TrendingUp, Calendar, Store, Table2 } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Calendar, Store, Table2, Zap } from 'lucide-react';
 
 const NAV = [
+  { id: 'hoje',     label: 'Hoje',      icon: Zap },
   { id: 'overview', label: 'Geral',      icon: LayoutDashboard },
   { id: 'trend',    label: 'Tendência',  icon: TrendingUp },
   { id: 'weekly',   label: 'Semanal',    icon: Calendar },
