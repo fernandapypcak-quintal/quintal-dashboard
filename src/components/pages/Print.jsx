@@ -54,7 +54,7 @@ export default function PrintReport({ onClose }) {
       const lrAAFull = recsAAFull.filter(r => r.Loja === loja);
       const real = sum(lr);
       const tend = calcTendFat(lr, lastDay, totalDays, ano, mes);
-      const meta = getMeta(loja, ano, mes);
+      const meta = getMeta(key, loja);
       const ating = meta > 0 ? real/meta*100 : null;
       return {
         loja, real, tend,
@@ -79,7 +79,7 @@ export default function PrintReport({ onClose }) {
              total, casa, delivery, yoy, tendFat, tendVsAA,
              pctCasa: total>0?casa/total*100:0,
              pctDel:  total>0?delivery/total*100:0,
-             porLoja, dias };
+             porLoja, dias, lojas };
   }, [rawData, getMeta]);
 
   if (!data) return null;
@@ -142,7 +142,9 @@ export default function PrintReport({ onClose }) {
     body { padding: 10mm; }
     .no-print { display: none !important; }
     .page-break { page-break-before: always; }
-    @page { size: A4 landscape; margin: 10mm; }
+    @page { size: A4 landscape; margin: 8mm; }
+    table { font-size: 8px !important; }
+    .kpi-value { font-size: 14px !important; }
   }
 </style>
 </head>
@@ -238,7 +240,7 @@ export default function PrintReport({ onClose }) {
       <td>${fmt(data.total)}</td>
       <td class="${data.yoy>=0?'pos':'neg'}">${pct(data.yoy)}</td>
       <td>${fmt(data.porLoja.reduce((s,l)=>s+(l.meta||0),0))}</td>
-      <td style="font-weight:800">${(data.total/data.porLoja.reduce((s,l)=>s+(l.meta||0),0)*100).toFixed(1).replace('.',',')}%</td>
+      <td style="font-weight:800">${(() => { const tm=data.porLoja.reduce((s,l)=>s+(l.meta||0),0); return tm>0?(data.total/tm*100).toFixed(1).replace('.',',')+'%':'—'; })()}</td>
       <td style="font-weight:700">${fmt(data.tendFat)}</td>
       <td class="${data.tendVsAA>=0?'pos':'neg'}">${pct(data.tendVsAA)}</td>
       <td>100%</td>
@@ -246,46 +248,58 @@ export default function PrintReport({ onClose }) {
   </tfoot>
 </table>
 
-<!-- SEÇÃO 3: FATURAMENTO DIÁRIO -->
-<div class="section-title page-break">3. Faturamento Diário — ${data.label}</div>
+<!-- SEÇÃO 3: FATURAMENTO DIÁRIO POR LOJA -->
+<div class="section-title page-break">3. Faturamento Diário por Loja — ${data.label}</div>
 <div class="info-bar">
-  Linha escura = ${data.ano} &nbsp;|&nbsp; Linha cinza = ${data.ano-1} (mesmo dia) &nbsp;|&nbsp; % = variação YoY
+  Valor principal = ${data.ano} &nbsp;|&nbsp; Cinza abaixo = ${data.ano-1} (mesmo dia) &nbsp;|&nbsp; % = variação YoY &nbsp;|&nbsp; ★ = fim de semana
 </div>
 
-<table>
+<table style="font-size:9px">
   <thead>
     <tr>
-      <th style="text-align:left">Dia</th>
-      <th>Faturamento ${data.ano}</th>
-      <th>Faturamento ${data.ano-1}</th>
-      <th>Variação</th>
-      <th>Salão ${data.ano}</th>
-      <th>Delivery ${data.ano}</th>
+      <th style="text-align:left;min-width:50px">Dia</th>
+      ${data.lojas.map(l => `<th style="min-width:70px">${l.replace('VILA ','V.')}</th>`).join('')}
+      <th style="min-width:70px;background:#0a2918">TOTAL</th>
     </tr>
   </thead>
   <tbody>
     ${data.dias.map(d => {
-      const recsDia = rawData.filter(r => r.Ano === data.ano && r.Mes === data.mes && r.Dia === d.dia);
-      const casa26  = sum(recsDia.filter(r => r.Canal === 'CASA'));
-      const del26   = sum(recsDia.filter(r => r.Canal === 'DELIVERY'));
+      const recs26 = rawData.filter(r => r.Ano===data.ano   && r.Mes===data.mes && r.Dia===d.dia);
+      const recs25 = rawData.filter(r => r.Ano===data.ano-1 && r.Mes===data.mes && r.Dia===d.dia);
       return `<tr class="${d.isWeekend?'weekend':''}">
-        <td>${d.dia} ${d.dow}${d.isWeekend?' ★':''}</td>
-        <td style="font-weight:${d.t26>0?'700':'400'}">${d.t26 > 0 ? fmt(d.t26) : '—'}</td>
-        <td style="color:#999">${d.t25 > 0 ? fmt(d.t25) : '—'}</td>
-        <td class="${d.var>=0?'pos':'neg'}">${d.t26>0&&d.t25>0 ? pct(d.var) : '—'}</td>
-        <td>${casa26 > 0 ? fmt(casa26) : '—'}</td>
-        <td>${del26  > 0 ? fmt(del26)  : '—'}</td>
+        <td><b>${d.dia}</b> <span style="color:#999;font-size:8px">${d.dow}${d.isWeekend?' ★':''}</span></td>
+        ${data.lojas.map(loja => {
+          const v26 = sum(recs26.filter(r=>r.Loja===loja));
+          const v25 = sum(recs25.filter(r=>r.Loja===loja));
+          const vr  = variation(v26, v25);
+          return `<td>
+            ${v26>0 ? `<div style="font-weight:700">${fmt(v26)}</div>` : '<div style="color:#ccc">—</div>'}
+            ${v25>0 ? `<div style="color:#aaa;font-size:8px">${fmt(v25)} <span style="color:${vr>=0?'#16a34a':'#dc2626'}">${pct(vr)}</span></div>` : ''}
+          </td>`;
+        }).join('')}
+        <td style="border-left:2px solid #1F3D2E">
+          ${d.t26>0 ? `<div style="font-weight:800">${fmt(d.t26)}</div>` : '<div style="color:#ccc">—</div>'}
+          ${d.t25>0 ? `<div style="color:#aaa;font-size:8px">${fmt(d.t25)} <span style="color:${d.var>=0?'#16a34a':'#dc2626'}">${pct(d.var)}</span></div>` : ''}
+        </td>
       </tr>`;
     }).join('')}
   </tbody>
   <tfoot>
     <tr class="tfoot">
-      <td>TOTAL (dias 1–${data.lastDay})</td>
-      <td>${fmt(data.total)}</td>
-      <td style="color:#666">${fmt(sum(rawData.filter(r=>r.Ano===data.ano-1&&r.Mes===data.mes&&r.Dia<=data.lastDay)))}</td>
-      <td class="${data.yoy>=0?'pos':'neg'}">${pct(data.yoy)}</td>
-      <td>${fmt(data.casa)}</td>
-      <td>${fmt(data.delivery)}</td>
+      <td>TOTAL</td>
+      ${data.lojas.map(loja => {
+        const t26 = sum(rawData.filter(r=>r.Ano===data.ano   && r.Mes===data.mes && r.Loja===loja));
+        const t25 = sum(rawData.filter(r=>r.Ano===data.ano-1 && r.Mes===data.mes && r.Dia<=data.lastDay && r.Loja===loja));
+        const vr  = variation(t26, t25);
+        return `<td>
+          <div>${fmt(t26)}</div>
+          <div style="font-size:8px;color:${vr>=0?'#16a34a':'#dc2626'}">${pct(vr)}</div>
+        </td>`;
+      }).join('')}
+      <td style="border-left:2px solid #1F3D2E">
+        <div>${fmt(data.total)}</div>
+        <div style="font-size:8px;color:${data.yoy>=0?'#16a34a':'#dc2626'}">${pct(data.yoy)}</div>
+      </td>
     </tr>
   </tfoot>
 </table>
