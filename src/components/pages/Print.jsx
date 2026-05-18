@@ -142,9 +142,7 @@ export default function PrintReport({ onClose }) {
     body { padding: 10mm; }
     .no-print { display: none !important; }
     .page-break { page-break-before: always; }
-    @page { size: A4 landscape; margin: 8mm; }
-    table { font-size: 8px !important; }
-    .kpi-value { font-size: 14px !important; }
+    @page { size: A4 landscape; margin: 10mm; }
   }
 </style>
 </head>
@@ -248,61 +246,67 @@ export default function PrintReport({ onClose }) {
   </tfoot>
 </table>
 
-<!-- SEÇÃO 3: FATURAMENTO DIÁRIO POR LOJA -->
-<div class="section-title page-break">3. Faturamento Diário por Loja — ${data.label}</div>
+<!-- SEÇÃO 3A: FATURAMENTO DIÁRIO — LOJAS 1-5 -->
+${(() => {
+  const metade1 = data.lojas.slice(0, 5);
+  const metade2 = data.lojas.slice(5);
+
+  function tabelaDiaria(lojasParte, subtitulo) {
+    return `
+<div class="section-title page-break">3${subtitulo}. Faturamento Diário por Loja — ${data.label}</div>
 <div class="info-bar">
   Valor principal = ${data.ano} &nbsp;|&nbsp; Cinza abaixo = ${data.ano-1} (mesmo dia) &nbsp;|&nbsp; % = variação YoY &nbsp;|&nbsp; ★ = fim de semana
 </div>
-
-<table style="font-size:9px">
+<table style="font-size:11px">
   <thead>
     <tr>
-      <th style="text-align:left;min-width:50px">Dia</th>
-      ${data.lojas.map(l => `<th style="min-width:70px">${l.replace('VILA ','V.')}</th>`).join('')}
-      <th style="min-width:70px;background:#0a2918">TOTAL</th>
+      <th style="text-align:left;width:60px">Dia</th>
+      ${lojasParte.map(l => `<th style="width:120px">${l}</th>`).join('')}
+      <th style="width:100px;background:#0a2918">TOTAL</th>
     </tr>
   </thead>
   <tbody>
     ${data.dias.map(d => {
       const recs26 = rawData.filter(r => r.Ano===data.ano   && r.Mes===data.mes && r.Dia===d.dia);
       const recs25 = rawData.filter(r => r.Ano===data.ano-1 && r.Mes===data.mes && r.Dia===d.dia);
-      return `<tr class="${d.isWeekend?'weekend':''}">
-        <td><b>${d.dia}</b> <span style="color:#999;font-size:8px">${d.dow}${d.isWeekend?' ★':''}</span></td>
-        ${data.lojas.map(loja => {
+      return '<tr class="' + (d.isWeekend?'weekend':'') + '">' +
+        '<td><b>' + d.dia + '</b> <span style="color:#999;font-size:9px">' + d.dow + (d.isWeekend?' ★':'') + '</span></td>' +
+        lojasParte.map(loja => {
           const v26 = sum(recs26.filter(r=>r.Loja===loja));
           const v25 = sum(recs25.filter(r=>r.Loja===loja));
           const vr  = variation(v26, v25);
-          return `<td>
-            ${v26>0 ? `<div style="font-weight:700">${fmt(v26)}</div>` : '<div style="color:#ccc">—</div>'}
-            ${v25>0 ? `<div style="color:#aaa;font-size:8px">${fmt(v25)} <span style="color:${vr>=0?'#16a34a':'#dc2626'}">${pct(vr)}</span></div>` : ''}
-          </td>`;
-        }).join('')}
-        <td style="border-left:2px solid #1F3D2E">
-          ${d.t26>0 ? `<div style="font-weight:800">${fmt(d.t26)}</div>` : '<div style="color:#ccc">—</div>'}
-          ${d.t25>0 ? `<div style="color:#aaa;font-size:8px">${fmt(d.t25)} <span style="color:${d.var>=0?'#16a34a':'#dc2626'}">${pct(d.var)}</span></div>` : ''}
-        </td>
-      </tr>`;
+          return '<td>' +
+            (v26>0 ? '<div style="font-weight:700">' + fmt(v26) + '</div>' : '<div style="color:#ccc">—</div>') +
+            (v25>0 ? '<div style="color:#aaa;font-size:9px">' + fmt(v25) + ' <span style="color:' + (vr>=0?'#16a34a':'#dc2626') + '">' + pct(vr) + '</span></div>' : '') +
+          '</td>';
+        }).join('') +
+        '<td style="border-left:2px solid #1F3D2E">' +
+          (d.t26>0 ? '<div style="font-weight:800">' + fmt(d.t26) + '</div>' : '<div style="color:#ccc">—</div>') +
+          (d.t25>0 ? '<div style="color:#aaa;font-size:9px">' + fmt(d.t25) + ' <span style="color:' + (d.var>=0?'#16a34a':'#dc2626') + '">' + pct(d.var) + '</span></div>' : '') +
+        '</td>' +
+      '</tr>';
     }).join('')}
   </tbody>
   <tfoot>
     <tr class="tfoot">
       <td>TOTAL</td>
-      ${data.lojas.map(loja => {
+      ${lojasParte.map(loja => {
         const t26 = sum(rawData.filter(r=>r.Ano===data.ano   && r.Mes===data.mes && r.Loja===loja));
         const t25 = sum(rawData.filter(r=>r.Ano===data.ano-1 && r.Mes===data.mes && r.Dia<=data.lastDay && r.Loja===loja));
         const vr  = variation(t26, t25);
-        return `<td>
-          <div>${fmt(t26)}</div>
-          <div style="font-size:8px;color:${vr>=0?'#16a34a':'#dc2626'}">${pct(vr)}</div>
-        </td>`;
+        return '<td><div style="font-weight:700">' + fmt(t26) + '</div><div style="font-size:9px;color:' + (vr>=0?'#16a34a':'#dc2626') + '">' + pct(vr) + '</div></td>';
       }).join('')}
       <td style="border-left:2px solid #1F3D2E">
-        <div>${fmt(data.total)}</div>
-        <div style="font-size:8px;color:${data.yoy>=0?'#16a34a':'#dc2626'}">${pct(data.yoy)}</div>
+        <div style="font-weight:800">${fmt(data.total)}</div>
+        <div style="font-size:9px;color:${data.yoy>=0?'#16a34a':'#dc2626'}">${pct(data.yoy)}</div>
       </td>
     </tr>
   </tfoot>
-</table>
+</table>`;
+  }
+
+  return tabelaDiaria(metade1, 'A') + tabelaDiaria(metade2, 'B');
+})()}
 
 <!-- FOOTER -->
 <div class="footer">
