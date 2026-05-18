@@ -185,8 +185,8 @@ export default function Overview() {
     // Aplica filtro de loja (igual ao baseData)
     const filtrarAlmoco = (recs) => {
       let filtered = recs;
-      // Exclui dados do dia atual (podem estar incompletos — regra D-1)
-      filtered = filtered.filter(r => r.Dia < lastDay);
+      // Exclui dados do dia atual e posteriores (regra D-1: só até lastDay)
+      filtered = filtered.filter(r => r.Dia <= lastDay);
       if (filters.lojas.size === 0) return filtered;
       return filtered.filter(r => filters.lojas.has(r.Loja));
     };
