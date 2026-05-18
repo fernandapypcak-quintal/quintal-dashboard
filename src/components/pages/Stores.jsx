@@ -150,14 +150,25 @@ export default function Stores() {
         totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
         totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
       };
-    }).sort((a, b) => b.realAtual - a.realAtual);
+    }).sort((a, b) => {
+      // Ordena por % atingimento (desc), quem não tem meta vai pro fim
+      if (a.ating === null && b.ating === null) return b.realAtual - a.realAtual;
+      if (a.ating === null) return 1;
+      if (b.ating === null) return -1;
+      return b.ating - a.ating;
+    });
   }, [lojas, rawData, periodo, getMeta]);
 
   if (!periodo) return null;
 
   const grandMeta  = lojaStats.reduce((s, l) => s + l.meta, 0);
-  const grandReal  = lojaStats.reduce((s, l) => s + l.realAtual, 0);
-  const grandAting = grandMeta > 0 ? grandReal / grandMeta * 100 : null;
+  const grandReal     = lojaStats.reduce((s, l) => s + l.realAtual, 0);
+  const grandAting    = grandMeta > 0 ? grandReal / grandMeta * 100 : null;
+  const grandTend     = lojaStats.reduce((s, l) => s + l.tendFat, 0);
+  const grandRealAA   = lojaStats.reduce((s, l) => s + (l.realAA   || 0), 0);
+  const grandTendAA   = lojaStats.reduce((s, l) => s + (l.prevAAfull || 0), 0);
+  const grandYoY      = grandRealAA > 0 ? variation(grandReal, grandRealAA) : null;
+  const grandTendVsAA = grandTendAA  > 0 ? variation(grandTend, grandTendAA) : null;
 
   return (
     <div className="p-6 space-y-4 animate-fade-in">
@@ -504,11 +515,26 @@ export default function Stores() {
             <tr className="border-t-2 border-surface-border bg-surface-muted/30">
               <td colSpan={2} className="py-3 pr-3 text-xs font-semibold text-zinc-500 uppercase">Total</td>
               <td className="py-3 px-3 text-right font-mono text-sm font-bold text-brand-black">{formatBRL(grandReal, true)}</td>
-              <td className="py-3 px-3" />
+              <td className="py-3 px-3 text-right">
+                {grandYoY !== null ? (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${grandYoY >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
+                    {grandYoY >= 0 ? '▲' : '▼'} {Math.abs(grandYoY).toFixed(1).replace('.',',')}%
+                  </span>
+                ) : '—'}
+              </td>
               <td className="py-3 px-3 text-right font-mono text-xs">{grandMeta > 0 ? formatBRL(grandMeta, true) : '—'}</td>
               <td className="py-3 px-3 text-right">{grandAting !== null ? <AtingBadge pct={grandAting} /> : '—'}</td>
-              <td className="py-3 px-3 text-right font-mono text-xs font-semibold">{formatBRL(lojaStats.reduce((s,l)=>s+l.tendFat,0), true)}</td>
-              <td colSpan={2} />
+              <td className="py-3 px-3 text-right font-mono text-xs font-semibold">{formatBRL(grandTend, true)}</td>
+              <td className="py-3 px-3 text-right">
+                {grandTendVsAA !== null ? (
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${grandTendVsAA >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
+                    {grandTendVsAA >= 0 ? '▲' : '▼'} {Math.abs(grandTendVsAA).toFixed(1).replace('.',',')}%
+                  </span>
+                ) : '—'}
+              </td>
+              <td className="py-3 pl-3 text-right">
+                <span className="text-xs font-semibold text-zinc-600">100%</span>
+              </td>
             </tr>
           </tfoot>
         </table>
