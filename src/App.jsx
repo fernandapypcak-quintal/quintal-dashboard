@@ -5,6 +5,7 @@ import { MetasProvider } from './hooks/useMetas';
 import { LabelsProvider } from './hooks/useLabels';
 import { AlmocoProvider } from './hooks/useAlmoco';
 import Sidebar from './components/layout/Sidebar';
+import BottomNav from './components/layout/BottomNav';
 import Header from './components/layout/Header';
 import Overview from './components/pages/Overview';
 import Trend from './components/pages/Trend';
@@ -28,12 +29,22 @@ function Dashboard() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-base">
-      <Sidebar activePage={activePage} onPageChange={setActivePage} />
+      {/* Sidebar — só aparece em telas grandes */}
+      <div className="hidden lg:flex">
+        <Sidebar activePage={activePage} onPageChange={setActivePage} />
+      </div>
+
+      {/* Conteúdo principal */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Header activePage={activePage} />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pb-20 lg:pb-0">
           <PageComponent key={activePage} />
         </main>
+      </div>
+
+      {/* Bottom nav — só aparece em mobile */}
+      <div className="lg:hidden">
+        <BottomNav activePage={activePage} onPageChange={setActivePage} />
       </div>
     </div>
   );

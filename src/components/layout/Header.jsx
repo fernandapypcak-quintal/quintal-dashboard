@@ -1,94 +1,246 @@
 // src/components/layout/Header.jsx
-import { Filter, X, Tag } from 'lucide-react';
+import { useState } from 'react';
+import { SlidersHorizontal, Tag, X, ChevronDown, Filter } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
 import { useLabels } from '../../hooks/useLabels';
 import MultiSelect from '../ui/MultiSelect';
 
-const PAGE_TITLES = {
-  overview: 'Visão Geral', trend: 'Tendência', yoy: 'Ano vs Ano',
-  weekly: 'Semanal', stores: 'Por Loja', metas: 'Metas', history: 'Histórico',
+const PAGE_LABELS = {
+  overview: 'Visão Geral', trend: 'Tendência',
+  weekly: 'Semanal', stores: 'Por Loja', history: 'Histórico',
 };
+
+const MESES = [
+  {num:1,nome:'Jan'},{num:2,nome:'Fev'},{num:3,nome:'Mar'},{num:4,nome:'Abr'},
+  {num:5,nome:'Mai'},{num:6,nome:'Jun'},{num:7,nome:'Jul'},{num:8,nome:'Ago'},
+  {num:9,nome:'Set'},{num:10,nome:'Out'},{num:11,nome:'Nov'},{num:12,nome:'Dez'},
+];
+
+function today() {
+  return new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
 
 export default function Header({ activePage }) {
   const { filters, meta, updateFilter, resetFilters, hasActiveFilters } = useFilters();
   const { showLabels, toggleLabels } = useLabels();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const lojaOptions = meta.lojas.map(l => ({ value: l, label: l }));
-  const mesOptions  = meta.meses.map(m => ({ value: m.num, label: m.nome }));
+  const mesesAtivos = [...filters.meses];
+  const mesLabel = mesesAtivos.length === 1
+    ? MESES.find(m => m.num === mesesAtivos[0])?.nome
+    : mesesAtivos.length > 1 ? `${mesesAtivos.length} meses` : null;
 
   return (
-    <header className="sticky top-0 z-20 bg-surface-base/90 backdrop-blur-md border-b border-surface-border px-6 py-3 flex items-center justify-between gap-4 flex-wrap">
-      <div className="flex items-center gap-3">
-        <h1 className="text-base font-semibold text-brand-black font-display">
-          {PAGE_TITLES[activePage]}
-        </h1>
-        <span className="hidden sm:block text-xs text-zinc-400">
-          {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </span>
-      </div>
+    <>
+      <header className="bg-surface-card border-b border-surface-border px-4 py-3 flex items-center justify-between gap-3 flex-shrink-0">
+        {/* Left: page title + date */}
+        <div className="min-w-0">
+          <h1 className="text-base font-semibold text-brand-black truncate">
+            {PAGE_LABELS[activePage] || activePage}
+          </h1>
+          <p className="text-xs text-zinc-400 hidden sm:block">{today()}</p>
+        </div>
 
-      <div className="flex items-center gap-2 flex-wrap justify-end">
-        <Filter size={13} className="text-zinc-400 hidden sm:block" />
+        {/* Right: filter chips + buttons */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Active filter chips — desktop */}
+          <div className="hidden md:flex items-center gap-2">
+            {/* Lojas */}
+            <MultiSelect
+              label="Todas as lojas"
+              options={meta.lojas.map(l => ({ value: l, label: l }))}
+              selected={filters.lojas}
+              onChange={s => updateFilter('lojas', s)}
+            />
 
-        <MultiSelect
-          options={lojaOptions}
-          selected={filters.lojas}
-          onChange={val => updateFilter('lojas', val)}
-          placeholder="Todas as lojas"
-          allLabel="Todas as lojas"
-        />
+            {/* Canal */}
+            <select
+              value={filters.canal}
+              onChange={e => updateFilter('canal', e.target.value)}
+              className="text-sm border border-surface-border rounded-xl px-3 py-1.5 bg-white text-zinc-700 cursor-pointer hover:border-zinc-400 transition-colors outline-none">
+              <option value="Todos">Salão + Delivery</option>
+              <option value="CASA">Salão</option>
+              <option value="DELIVERY">Delivery</option>
+            </select>
 
-        <select
-          value={filters.canal}
-          onChange={e => updateFilter('canal', e.target.value)}
-          className="filter-select"
-        >
-          <option value="Todos">Salão + Delivery</option>
-          <option value="CASA">Salão</option>
-          <option value="DELIVERY">Delivery</option>
-        </select>
+            {/* Ano */}
+            <select
+              value={filters.ano}
+              onChange={e => updateFilter('ano', e.target.value)}
+              className="text-sm border border-surface-border rounded-xl px-3 py-1.5 bg-white text-zinc-700 cursor-pointer hover:border-zinc-400 transition-colors outline-none">
+              <option value="Todos">Todos os anos</option>
+              {meta.anos.map(a => <option key={a} value={String(a)}>{a}</option>)}
+            </select>
 
-        <select
-          value={filters.ano}
-          onChange={e => updateFilter('ano', e.target.value)}
-          className="filter-select"
-        >
-          <option value="Todos">Todos os anos</option>
-          {meta.anos.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
+            {/* Mês chip */}
+            {mesLabel ? (
+              <span className="inline-flex items-center gap-1.5 bg-brand-black text-white text-sm font-medium px-3 py-1.5 rounded-xl">
+                {mesLabel}
+                <button onClick={() => updateFilter('meses', new Set())} className="hover:opacity-70 transition-opacity">
+                  <X size={12}/>
+                </button>
+              </span>
+            ) : (
+              <select
+                value=""
+                onChange={e => {
+                  if (e.target.value) updateFilter('meses', new Set([Number(e.target.value)]));
+                }}
+                className="text-sm border border-surface-border rounded-xl px-3 py-1.5 bg-white text-zinc-700 cursor-pointer hover:border-zinc-400 transition-colors outline-none">
+                <option value="">Todos os meses</option>
+                {MESES.map(m => <option key={m.num} value={m.num}>{m.nome}</option>)}
+              </select>
+            )}
+          </div>
 
-        <MultiSelect
-          options={mesOptions}
-          selected={filters.meses}
-          onChange={val => updateFilter('meses', val)}
-          placeholder="Todos os meses"
-          allLabel="Todos os meses"
-        />
-
-        {/* Labels toggle */}
-        <button
-          onClick={toggleLabels}
-          title={showLabels ? 'Ocultar rótulos' : 'Mostrar rótulos nos gráficos'}
-          className={`flex items-center gap-1.5 h-8 px-2.5 text-xs font-medium rounded-lg border transition-all ${
-            showLabels
-              ? 'bg-brand-olive text-white border-brand-olive'
-              : 'bg-white text-zinc-500 border-surface-border hover:border-zinc-400 hover:text-zinc-700'
-          }`}
-        >
-          <Tag size={12} />
-          <span className="hidden sm:inline">Rótulos</span>
-        </button>
-
-        {hasActiveFilters && (
+          {/* Rótulos button */}
           <button
-            onClick={resetFilters}
-            className="flex items-center gap-1.5 h-8 px-2.5 text-xs font-medium text-rose-600 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-colors"
-          >
-            <X size={12} />
-            Limpar
+            onClick={toggleLabels}
+            className={`hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border transition-colors
+              ${showLabels
+                ? 'bg-brand-black text-white border-brand-black'
+                : 'border-surface-border text-zinc-500 hover:border-zinc-400'}`}>
+            <Tag size={13}/>
+            <span className="hidden lg:inline">Rótulos</span>
           </button>
-        )}
-      </div>
-    </header>
+
+          {/* Mobile filter button */}
+          <button
+            onClick={() => setFiltersOpen(true)}
+            className={`md:hidden flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border transition-colors
+              ${hasActiveFilters
+                ? 'bg-brand-black text-white border-brand-black'
+                : 'border-surface-border text-zinc-500'}`}>
+            <Filter size={14}/>
+            {hasActiveFilters && <span className="text-xs">Filtros</span>}
+          </button>
+
+          {/* Limpar — desktop */}
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="hidden md:flex items-center gap-1 text-sm font-medium text-rose-500 hover:text-rose-600 px-3 py-1.5 rounded-xl border border-rose-200 hover:border-rose-300 transition-colors">
+              <X size={13}/> Limpar
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Mobile filter drawer */}
+      {filtersOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40" onClick={() => setFiltersOpen(false)}/>
+          {/* Drawer */}
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-base font-semibold text-brand-black">Filtros</h2>
+              <button onClick={() => setFiltersOpen(false)}>
+                <X size={20} className="text-zinc-400"/>
+              </button>
+            </div>
+
+            {/* Canal */}
+            <div>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Canal</label>
+              <div className="flex gap-2">
+                {['Todos','CASA','DELIVERY'].map(v => (
+                  <button key={v}
+                    onClick={() => updateFilter('canal', v)}
+                    className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-colors
+                      ${filters.canal === v
+                        ? 'bg-brand-black text-white border-brand-black'
+                        : 'border-surface-border text-zinc-600'}`}>
+                    {v === 'Todos' ? 'Todos' : v === 'CASA' ? 'Salão' : 'Delivery'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ano */}
+            <div>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Ano</label>
+              <div className="flex gap-2 flex-wrap">
+                {['Todos', ...meta.anos.map(String)].map(a => (
+                  <button key={a}
+                    onClick={() => updateFilter('ano', a)}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium border transition-colors
+                      ${filters.ano === a
+                        ? 'bg-brand-black text-white border-brand-black'
+                        : 'border-surface-border text-zinc-600'}`}>
+                    {a === 'Todos' ? 'Todos' : a}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mês */}
+            <div>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Mês</label>
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  onClick={() => updateFilter('meses', new Set())}
+                  className={`py-2 rounded-xl text-xs font-medium border transition-colors
+                    ${filters.meses.size === 0
+                      ? 'bg-brand-black text-white border-brand-black'
+                      : 'border-surface-border text-zinc-600'}`}>
+                  Todos
+                </button>
+                {MESES.map(m => (
+                  <button key={m.num}
+                    onClick={() => updateFilter('meses', new Set([m.num]))}
+                    className={`py-2 rounded-xl text-xs font-medium border transition-colors
+                      ${filters.meses.has(m.num)
+                        ? 'bg-brand-black text-white border-brand-black'
+                        : 'border-surface-border text-zinc-600'}`}>
+                    {m.nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Loja */}
+            <div>
+              <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-2">Loja</label>
+              <div className="grid grid-cols-2 gap-2">
+                {meta.lojas.map(l => (
+                  <button key={l}
+                    onClick={() => {
+                      const s = new Set(filters.lojas);
+                      s.has(l) ? s.delete(l) : s.add(l);
+                      updateFilter('lojas', s);
+                    }}
+                    className={`py-2 px-3 rounded-xl text-xs font-medium border text-left transition-colors
+                      ${filters.lojas.has(l)
+                        ? 'bg-brand-black text-white border-brand-black'
+                        : 'border-surface-border text-zinc-600'}`}>
+                    {l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Rótulos + Limpar */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={toggleLabels}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border transition-colors
+                  ${showLabels
+                    ? 'bg-brand-black text-white border-brand-black'
+                    : 'border-surface-border text-zinc-600'}`}>
+                <Tag size={14}/> Rótulos
+              </button>
+              {hasActiveFilters && (
+                <button
+                  onClick={() => { resetFilters(); setFiltersOpen(false); }}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border border-rose-200 text-rose-500 transition-colors">
+                  <X size={14}/> Limpar filtros
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
