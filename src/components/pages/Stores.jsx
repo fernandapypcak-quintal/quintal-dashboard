@@ -106,7 +106,8 @@ export default function Stores() {
       const tendVsAA = variation(tendFat, prevAAfull);
 
       // Share
-      const share = grandTotal > 0 ? realAtual / grandTotal * 100 : 0;
+      const share    = grandTotal > 0 ? realAtual / grandTotal * 100 : 0;
+      const tendAting = meta > 0 ? tendFat / meta * 100 : null;
 
       // Melhor dia da semana
       const dowStats = DOW_LABELS.map((label, dowIdx) => {
@@ -130,7 +131,7 @@ export default function Stores() {
         loja, color, idx,
         realAtual, realAA, casa, delivery,
         meta, ating, tendFat, tendVsAA, prevAAfull,
-        share, yoy, melhorDia, monthly,
+        share, yoy, melhorDia, monthly, tendAting,
         totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
         aceleracao, media1a, media2a,
         totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
@@ -234,8 +235,17 @@ export default function Stores() {
                       </div>
                     )}
 
+                    {l.tendAting !== null && (
+                      <div>
+                        <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">Proj. Meta</p><InfoTip text="Se continuar no ritmo atual, vai atingir esse % da meta no fim do mês." /></div>
+                        <p className={`font-bold ${l.tendAting >= 100 ? 'text-emerald-600' : l.tendAting >= 80 ? 'text-amber-600' : 'text-rose-600'}`}>
+                          {l.tendAting.toFixed(1).replace('.', ',')}%
+                        </p>
+                        <p className="text-[10px] text-zinc-400">{formatBRL(l.tendFat, true)} de {formatBRL(l.meta, true)}</p>
+                      </div>
+                    )}
                     <div>
-                      <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">Share</p><InfoTip text="% que esta loja representa no faturamento total do período." /></div>
+                      <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">Peso</p><InfoTip text="% que esta loja representa no faturamento total do período." /></div>
                       <p className="font-semibold text-zinc-600">{l.share.toFixed(1)}%</p>
                     </div>
 
@@ -436,7 +446,7 @@ export default function Stores() {
               <th className="table-header text-right py-2 px-3"><>% Ating.<InfoTip text="% da meta atingida até agora. Vermelho = abaixo de 80%, Amarelo = 80-99%, Verde = 100%+." /></></th>
               <th className="table-header text-right py-2 px-3">Tend Fat</th>
               <th className="table-header text-right py-2 px-3">Tend vs AA</th>
-              <th className="table-header text-right py-2 px-3"><>Aceleração<InfoTip text="Média diária da 2ª metade do mês vs 1ª metade. ▲ = acelerando, ▼ = desacelerando." /></></th>
+              <th className="table-header text-right py-2 px-3"><>Proj. Meta<InfoTip text="Se continuar no ritmo atual (Tend Fat), qual % da meta vai atingir no fim do mês." /></></th>
               <th className="table-header text-right py-2 pl-3">Peso</th>
             </tr>
           </thead>
@@ -486,13 +496,13 @@ export default function Stores() {
                     ) : '—'}
                   </td>
                   <td className="py-3 px-3 text-right">
-                    {l.aceleracao !== null ? (
+                    {l.tendAting !== null ? (
                       <div>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${l.aceleracao >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
-                          {l.aceleracao >= 0 ? '▲' : '▼'} {Math.abs(l.aceleracao).toFixed(1).replace('.', ',')}%
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${l.tendAting >= 100 ? 'text-emerald-700 bg-emerald-50' : l.tendAting >= 80 ? 'text-amber-700 bg-amber-50' : 'text-rose-700 bg-rose-50'}`}>
+                          {l.tendAting.toFixed(1).replace('.', ',')}%
                         </span>
                         <p className="text-[10px] text-zinc-400 mt-0.5">
-                          {formatBRL(l.media1a,true)} → {formatBRL(l.media2a,true)}/dia
+                          {formatBRL(l.tendFat, true)} de {formatBRL(l.meta, true)}
                         </p>
                       </div>
                     ) : <span className="text-zinc-300 text-xs">—</span>}
