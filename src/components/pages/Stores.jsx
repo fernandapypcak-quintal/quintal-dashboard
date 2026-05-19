@@ -436,7 +436,8 @@ export default function Stores() {
               <th className="table-header text-right py-2 px-3"><>% Ating.<InfoTip text="% da meta atingida até agora. Vermelho = abaixo de 80%, Amarelo = 80-99%, Verde = 100%+." /></></th>
               <th className="table-header text-right py-2 px-3">Tend Fat</th>
               <th className="table-header text-right py-2 px-3">Tend vs AA</th>
-              <th className="table-header text-right py-2 pl-3">Share</th>
+              <th className="table-header text-right py-2 px-3"><>Aceleração<InfoTip text="Média diária da 2ª metade do mês vs 1ª metade. ▲ = acelerando, ▼ = desacelerando." /></></th>
+              <th className="table-header text-right py-2 pl-3">Peso</th>
             </tr>
           </thead>
           <tbody>
