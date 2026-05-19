@@ -125,7 +125,12 @@ export default function Hoje() {
       });
 
       // Monta porLoja
-      const todasLojas = [...new Set(lojasMapeadas.map(l => MAPA_LOJAS[l.name].loja))].sort();
+      // União de lojas com dados em qualquer um dos dois dias
+      const todasLojas = [...new Set([
+        ...Object.keys(fatHoje),
+        ...Object.keys(fatOntem),
+        ...lojasMapeadas.map(l => MAPA_LOJAS[l.name].loja)
+      ])].sort();
       const porLoja = todasLojas.map(loja => {
         const h  = fatHoje[loja]   || { total: 0, casa: 0, delivery: 0 };
         const o  = fatOntem[loja]  || { total: 0, casa: 0, delivery: 0 };
@@ -135,10 +140,8 @@ export default function Hoje() {
         const ticket       = c.pessoas  > 0 ? c.total  / c.pessoas  : 0;
         const ticketOntem  = co.pessoas > 0 ? co.total / co.pessoas : 0;
         return { loja, hoje: h, ontem: o, varOntem, ticket, ticketOntem, pessoas: c.pessoas, pessoasOntem: co.pessoas };
-      }).filter(l => mostraDia === 'hoje' ? l.hoje.total > 0 : l.ontem.total > 0)
-        .sort((a,b) => mostraDia === 'hoje'
-          ? b.hoje.total - a.hoje.total
-          : b.ontem.total - a.ontem.total);
+      }).filter(l => l.hoje.total > 0 || l.ontem.total > 0) // keep all lojas with any data
+        .sort((a,b) => b.hoje.total - a.hoje.total); // default sort by hoje
 
       const totalHoje  = porLoja.reduce((s,l) => s + l.hoje.total,  0);
       const totalOntem = porLoja.reduce((s,l) => s + l.ontem.total, 0);
@@ -296,7 +299,10 @@ export default function Hoje() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dados.porLoja.map(l => {
+                  {dados.porLoja
+                  .filter(l => mostraDia === 'hoje' ? l.hoje.total > 0 : l.ontem.total > 0)
+                  .sort((a,b) => mostraDia === 'hoje' ? b.hoje.total - a.hoje.total : b.ontem.total - a.ontem.total)
+                  .map(l => {
                     const v = mostraDia === 'hoje' ? l.hoje : l.ontem;
                     const total = mostraDia === 'hoje' ? dados.totalHoje : dados.totalOntem;
                     const share = total > 0 ? v.total/total*100 : 0;
