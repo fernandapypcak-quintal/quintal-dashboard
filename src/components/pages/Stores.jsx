@@ -76,6 +76,16 @@ export default function Stores() {
       const meta  = getMeta(latestKey, loja);
       const ating = meta > 0 ? realAtual / meta * 100 : null;
 
+      // Aceleração — compara média diária da 2ª metade vs 1ª metade do mês
+      const meioMes   = Math.floor(lastDay / 2);
+      const recs1a    = recsCur.filter(r => r.Dia <= meioMes);
+      const recs2a    = recsCur.filter(r => r.Dia > meioMes);
+      const dias1a    = new Set(recs1a.map(r => r.Dia)).size;
+      const dias2a    = new Set(recs2a.map(r => r.Dia)).size;
+      const media1a   = dias1a > 0 ? sum(recs1a) / dias1a : 0;
+      const media2a   = dias2a > 0 ? sum(recs2a) / dias2a : 0;
+      const aceleracao = media1a > 0 ? ((media2a - media1a) / media1a) * 100 : null;
+
       // Almoço desta loja
       const recsAlmoco    = getAlmocoLoja(ano, mes, loja);
       const totalAlmoco   = recsAlmoco.reduce((s,r) => s+r.Valor, 0);
@@ -122,6 +132,7 @@ export default function Stores() {
         meta, ating, tendFat, tendVsAA, prevAAfull,
         share, yoy, melhorDia, monthly,
         totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
+        aceleracao, media1a, media2a,
         totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
       };
     }).sort((a, b) => {
@@ -473,6 +484,18 @@ export default function Stores() {
                       </span>
                     ) : '—'}
                   </td>
+                  <td className="py-3 px-3 text-right">
+                    {l.aceleracao !== null ? (
+                      <div>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${l.aceleracao >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
+                          {l.aceleracao >= 0 ? '▲' : '▼'} {Math.abs(l.aceleracao).toFixed(1).replace('.', ',')}%
+                        </span>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">
+                          {formatBRL(l.media1a,true)} → {formatBRL(l.media2a,true)}/dia
+                        </p>
+                      </div>
+                    ) : <span className="text-zinc-300 text-xs">—</span>}
+                  </td>
                   <td className="py-3 pl-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       <div className="w-10 h-1 bg-surface-muted rounded-full overflow-hidden">
@@ -506,6 +529,7 @@ export default function Stores() {
                   </span>
                 ) : '—'}
               </td>
+              <td className="py-3 px-3 text-right text-zinc-300 text-xs">—</td>
               <td className="py-3 pl-3 text-right">
                 <span className="text-xs font-semibold text-zinc-600">100%</span>
               </td>

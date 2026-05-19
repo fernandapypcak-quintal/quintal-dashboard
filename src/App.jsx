@@ -4,6 +4,7 @@ import { FilterProvider, useFilters } from './hooks/useFilters';
 import { MetasProvider } from './hooks/useMetas';
 import { LabelsProvider } from './hooks/useLabels';
 import { AlmocoProvider } from './hooks/useAlmoco';
+import { TicketProvider } from './hooks/useTicket';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import Header from './components/layout/Header';
@@ -57,7 +58,9 @@ export default function App() {
       <MetasProvider>
         <LabelsProvider>
           <AlmocoProvider>
-            <Dashboard />
+            <TicketProvider>
+              <Dashboard />
+            </TicketProvider>
           </AlmocoProvider>
         </LabelsProvider>
       </MetasProvider>

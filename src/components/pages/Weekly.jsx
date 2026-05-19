@@ -25,28 +25,39 @@ function PctLabel({ x, y, width, value, showLabels }) {
 }
 
 // Retorna as semanas de um mês, numeradas como S1, S2, S3...
+// Semana = cada grupo de 7 dias: S1=dias 1-7, S2=dias 8-14, S3=dias 15-21, S4=dias 22-28, S5=dias 29+
 function getWeeksOfMonth(records, ano, mes) {
   if (!records.length) return [];
 
-  // Agrupa por Semana_Inicio dentro do mês
+  const recs = records.filter(r => r.Ano === ano && r.Mes === mes);
+  if (!recs.length) return [];
+
+  // Agrupa por semana do mês (1-7, 8-14, 15-21, 22-28, 29+)
   const byWeek = {};
-  records.forEach(r => {
-    if (r.Ano !== ano || r.Mes !== mes) return;
-    const key = r.Semana_Inicio;
-    if (!byWeek[key]) byWeek[key] = { inicio: key, label: r.Semana_Label, records: [] };
-    byWeek[key].records.push(r);
+  recs.forEach(r => {
+    const dia = r.Dia || 1;
+    const semNum = Math.ceil(dia / 7); // 1, 2, 3, 4, 5
+    if (!byWeek[semNum]) byWeek[semNum] = { semNum, records: [] };
+    byWeek[semNum].records.push(r);
   });
 
   return Object.values(byWeek)
-    .sort((a, b) => a.inicio.localeCompare(b.inicio))
-    .map((w, i) => ({
-      label: `S${i + 1}`,
-      labelFull: w.label,
-      inicio: w.inicio,
-      casa:     sum(w.records.filter(r => r.Canal === 'CASA')),
-      delivery: sum(w.records.filter(r => r.Canal === 'DELIVERY')),
-      total:    sum(w.records),
-    }));
+    .sort((a, b) => a.semNum - b.semNum)
+    .map((w, i) => {
+      const diaInicio = (w.semNum - 1) * 7 + 1;
+      const diaFim    = Math.min(w.semNum * 7, new Date(ano, mes, 0).getDate());
+      const pad = d => String(d).padStart(2,'0');
+      const mesStr = pad(mes);
+      const anoStr = String(ano).slice(2);
+      return {
+        label:    `S${i + 1}`,
+        labelFull: `${pad(diaInicio)}/${mesStr} – ${pad(diaFim)}/${mesStr}/${anoStr}`,
+        inicio:   `${ano}-${mesStr}-${pad(diaInicio)}`,
+        casa:     sum(w.records.filter(r => r.Canal === 'CASA')),
+        delivery: sum(w.records.filter(r => r.Canal === 'DELIVERY')),
+        total:    sum(w.records),
+      };
+    });
 }
 
 export default function Weekly() {

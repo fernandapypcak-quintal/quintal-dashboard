@@ -7,6 +7,7 @@ import {
 import { DollarSign, Home, Truck, Target, Calendar, TrendingUp, TrendingDown } from 'lucide-react';
 import { useFilters } from '../../hooks/useFilters';
 import { useAlmoco } from '../../hooks/useAlmoco';
+import { useTicket } from '../../hooks/useTicket';
 import { useMetas } from '../../hooks/useMetas';
 import { useLabels } from '../../hooks/useLabels';
 import KpiCard from '../ui/KpiCard';
@@ -59,6 +60,7 @@ export default function Overview() {
   const { getMetaTotal } = useMetas();
   const { showLabels } = useLabels();
   const { getAlmoco } = useAlmoco();
+  const { getTicket, getDesconto } = useTicket();
 
   const lojas   = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
@@ -295,6 +297,52 @@ export default function Overview() {
           variation={kpis.tendVsAA}
           variationLabel={`vs ${periodo.label.split('/')[0]}/${String(periodo.ano-1).slice(2)}`} delay={240} />
       </div>
+
+      {/* ── TICKET MÉDIO + DESCONTO ── */}
+      {periodo && (() => {
+        const tk     = getTicket(periodo.ano, periodo.mes);
+        const tkSal  = getTicket(periodo.ano, periodo.mes, null, 'CASA');
+        const tkDel  = getTicket(periodo.ano, periodo.mes, null, 'DELIVERY');
+        const tkAlm  = getTicket(periodo.ano, periodo.mes); // almoço via compradores salão
+        const dsc    = getDesconto(periodo.ano, periodo.mes);
+        if (tk.pessoas === 0) return null;
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border border-surface-border rounded-2xl p-5">
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Médio</p>
+                <InfoTip text="Faturamento total dividido pelo número de compradores no período." />
+              </div>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tk.ticket)}</p>
+              <p className="text-xs text-zinc-400 mt-1">{tk.pessoas.toLocaleString('pt-BR')} pessoas</p>
+            </div>
+            <div className="bg-white border border-surface-border rounded-2xl p-5">
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Salão</p>
+                <InfoTip text="Ticket médio por pessoa no canal Salão." />
+              </div>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tkSal.ticket)}</p>
+              <p className="text-xs text-zinc-400 mt-1">{tkSal.pessoas.toLocaleString('pt-BR')} pessoas</p>
+            </div>
+            <div className="bg-white border border-surface-border rounded-2xl p-5">
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Delivery</p>
+                <InfoTip text="Ticket médio por pedido no canal Delivery." />
+              </div>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tkDel.ticket)}</p>
+              <p className="text-xs text-zinc-400 mt-1">{tkDel.pessoas.toLocaleString('pt-BR')} pedidos</p>
+            </div>
+            <div className="bg-white border border-surface-border rounded-2xl p-5">
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Desconto</p>
+                <InfoTip text="Total de desconto concedido no período e % sobre o faturamento bruto." />
+              </div>
+              <p className="text-2xl font-bold font-display text-rose-600">{formatBRL(dsc.desconto, true)}</p>
+              <p className="text-xs text-zinc-400 mt-1">{dsc.pct.toFixed(1).replace('.',',')}% do bruto</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── ALMOÇO ── */}
       {almocoData && (
