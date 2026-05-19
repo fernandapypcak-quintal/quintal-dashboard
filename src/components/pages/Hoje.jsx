@@ -86,12 +86,14 @@ export default function Hoje() {
           .then(d => ({ tipo: 'fat', dia: 'ontem', loja, data: d })),
         zigGet(`/erp/compradores?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
           .then(d => ({ tipo: 'comp', dia: 'hoje', loja, data: d })),
+        zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
+          .then(d => ({ tipo: 'comp', dia: 'ontem', loja, data: d })),
       ]);
 
       const results = await Promise.allSettled(promises);
 
       // Processa resultados
-      const fatHoje = {}, fatOntem = {}, compradores = {}, descontos = {};
+      const fatHoje = {}, fatOntem = {}, compradores = {}, compradoresOntem = {}, descontos = {};
 
       results.forEach(r => {
         if (r.status !== 'fulfilled') return;
@@ -113,10 +115,11 @@ export default function Hoje() {
         }
 
         if (tipo === 'comp') {
-          if (!compradores[key]) compradores[key] = { total: 0, pessoas: 0 };
+          const target = dia === 'hoje' ? compradores : compradoresOntem;
+          if (!target[key]) target[key] = { total: 0, pessoas: 0 };
           data.forEach(item => {
-            compradores[key].total   += (item.productsValue || 0) / 100;
-            compradores[key].pessoas += 1;
+            target[key].total   += (item.productsValue || 0) / 100;
+            target[key].pessoas += 1;
           });
         }
       });
@@ -126,21 +129,37 @@ export default function Hoje() {
       const porLoja = todasLojas.map(loja => {
         const h  = fatHoje[loja]   || { total: 0, casa: 0, delivery: 0 };
         const o  = fatOntem[loja]  || { total: 0, casa: 0, delivery: 0 };
-        const c  = compradores[loja] || { total: 0, pessoas: 0 };
+        const c  = compradores[loja]       || { total: 0, pessoas: 0 };
+        const co = compradoresOntem[loja]  || { total: 0, pessoas: 0 };
         const varOntem = o.total > 0 ? (h.total - o.total) / o.total * 100 : null;
-        const ticket   = c.pessoas > 0 ? c.total / c.pessoas : 0;
-        return { loja, hoje: h, ontem: o, varOntem, ticket, pessoas: c.pessoas };
-      }).filter(l => l.hoje.total > 0 || l.ontem.total > 0)
-        .sort((a,b) => b.hoje.total - a.hoje.total);
+        const ticket       = c.pessoas  > 0 ? c.total  / c.pessoas  : 0;
+        const ticketOntem  = co.pessoas > 0 ? co.total / co.pessoas : 0;
+        return { loja, hoje: h, ontem: o, varOntem, ticket, ticketOntem, pessoas: c.pessoas, pessoasOntem: co.pessoas };
+      }).filter(l => mostraDia === 'hoje' ? l.hoje.total > 0 : l.ontem.total > 0)
+        .sort((a,b) => mostraDia === 'hoje'
+          ? b.hoje.total - a.hoje.total
+          : b.ontem.total - a.ontem.total);
 
       const totalHoje  = porLoja.reduce((s,l) => s + l.hoje.total,  0);
       const totalOntem = porLoja.reduce((s,l) => s + l.ontem.total, 0);
-      const totalPessoas = porLoja.reduce((s,l) => s + l.pessoas, 0);
-      const ticketMedio  = totalPessoas > 0
-        ? porLoja.reduce((s,l) => s + l.ticket * l.pessoas, 0) / totalPessoas : 0;
+      // Ticket para hoje
+      const totalPessoasHoje = porLoja.reduce((s,l) => s + l.pessoas, 0);
+      const ticketMedioHoje  = totalPessoasHoje > 0
+        ? porLoja.reduce((s,l) => s + l.ticket * l.pessoas, 0) / totalPessoasHoje : 0;
+      // Ticket para ontem
+      const porLojaOntemComp = todasLojas.map(loja => {
+        const c = compradoresOntem[loja] || { total: 0, pessoas: 0 };
+        return { loja, ticket: c.pessoas > 0 ? c.total/c.pessoas : 0, pessoas: c.pessoas };
+      });
+      const totalPessoasOntem = porLojaOntemComp.reduce((s,l) => s + l.pessoas, 0);
+      const ticketMedioOntem  = totalPessoasOntem > 0
+        ? porLojaOntemComp.reduce((s,l) => s + l.ticket * l.pessoas, 0) / totalPessoasOntem : 0;
       const varTotal = totalOntem > 0 ? (totalHoje - totalOntem) / totalOntem * 100 : null;
 
-      setDados({ porLoja, totalHoje, totalOntem, varTotal, ticketMedio, totalPessoas, dtHoje, dtOntem });
+      setDados({ porLoja, totalHoje, totalOntem, varTotal,
+        ticketMedioHoje, ticketMedioOntem,
+        totalPessoasHoje, totalPessoasOntem,
+        dtHoje, dtOntem });
       setUltimaAtu(fmtHora());
     } catch (e) {
       setErro(e.message);
@@ -229,7 +248,7 @@ export default function Hoje() {
             <div className="bg-white border border-surface-border rounded-2xl p-4">
               <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Ticket Médio</p>
               <p className="text-2xl font-bold font-display text-brand-black">
-                {dados.ticketMedio > 0 ? formatBRL(dados.ticketMedio) : '—'}
+                {(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) > 0 ? formatBRL(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) : '—'}
               </p>
               {dados.totalPessoas > 0 && (
                 <p className="text-xs text-zinc-400 mt-1">{dados.totalPessoas} pessoas</p>
@@ -316,10 +335,10 @@ export default function Hoje() {
                           </td>
                         )}
                         <td className="py-3 px-4 text-right font-mono text-zinc-600">
-                          {l.ticket > 0 ? formatBRL(l.ticket) : '—'}
+                          {(mostraDia === 'hoje' ? l.ticket : l.ticketOntem) > 0 ? formatBRL(mostraDia === 'hoje' ? l.ticket : l.ticketOntem) : '—'}
                         </td>
                         <td className="py-3 px-4 text-right text-zinc-500">
-                          {l.pessoas > 0 ? l.pessoas : '—'}
+                          {(mostraDia === 'hoje' ? l.pessoas : l.pessoasOntem) > 0 ? (mostraDia === 'hoje' ? l.pessoas : l.pessoasOntem) : '—'}
                         </td>
                       </tr>
                     );
@@ -348,10 +367,10 @@ export default function Hoje() {
                       </td>
                     )}
                     <td className="py-3 px-4 text-right font-mono text-zinc-600">
-                      {dados.ticketMedio > 0 ? formatBRL(dados.ticketMedio) : '—'}
+                      {(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) > 0 ? formatBRL(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) : '—'}
                     </td>
                     <td className="py-3 px-4 text-right text-zinc-500">
-                      {dados.totalPessoas > 0 ? dados.totalPessoas : '—'}
+                      {(mostraDia === 'hoje' ? dados.totalPessoasHoje : dados.totalPessoasOntem) > 0 ? (mostraDia === 'hoje' ? dados.totalPessoasHoje : dados.totalPessoasOntem) : '—'}
                     </td>
                   </tr>
                 </tfoot>
