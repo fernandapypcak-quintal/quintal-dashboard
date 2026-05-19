@@ -45,7 +45,7 @@ export default function KpiCard({
         )}
       </div>
 
-      <p className="text-2xl font-bold text-brand-black font-display tracking-tight mb-2">
+      <p className="text-2xl font-bold text-brand-black font-display tracking-tight mb-2" title={typeof value === 'number' ? new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(value) : undefined}>
         {displayValue}
       </p>
 

@@ -12,7 +12,7 @@ export function daysInMonth(year, month) {
 
 export function formatBRL(v, compact = false) {
   if (v == null || isNaN(v)) return 'R$ 0,00';
-  if (compact && v >= 1e6) return `R$ ${(v/1e6).toFixed(1).replace('.',',')}M`;
+  if (compact && v >= 1e6) return `R$ ${(v/1e6).toFixed(2).replace('.',',')}M`;
   if (compact && v >= 1e3) return `R$ ${(v/1e3).toFixed(1).replace('.',',')}k`;
   return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2}).format(v);
 }

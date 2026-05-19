@@ -21,27 +21,36 @@ export function TicketProvider({ children }) {
     });
   }, []);
 
-  // Ticket médio para um período (ano+mes) e loja/canal opcionais
-  function getTicket(ano, mes, loja = null, canal = null) {
+  // Ticket médio — respeita filtro de lojas (Set), canal e período
+  function getTicket(ano, mes, canal = null, lojasFilter = null) {
     let recs = compradores.filter(r => r.Ano === ano && r.Mes === mes);
-    if (loja)  recs = recs.filter(r => r.Loja  === loja);
     if (canal) recs = recs.filter(r => r.Canal === canal);
+    if (lojasFilter && lojasFilter.size > 0) recs = recs.filter(r => lojasFilter.has(r.Loja));
     const totalPessoas = recs.reduce((s,r) => s + r.Pessoas, 0);
     const totalValor   = recs.reduce((s,r) => s + r.Valor,   0);
     return { ticket: totalPessoas > 0 ? totalValor/totalPessoas : 0, pessoas: totalPessoas, valor: totalValor };
   }
 
-  // Desconto para um período
-  function getDesconto(ano, mes, loja = null) {
+  // Ticket por loja específica
+  function getTicketLoja(ano, mes, loja, canal = null) {
+    let recs = compradores.filter(r => r.Ano === ano && r.Mes === mes && r.Loja === loja);
+    if (canal) recs = recs.filter(r => r.Canal === canal);
+    const totalPessoas = recs.reduce((s,r) => s + r.Pessoas, 0);
+    const totalValor   = recs.reduce((s,r) => s + r.Valor,   0);
+    return { ticket: totalPessoas > 0 ? totalValor/totalPessoas : 0, pessoas: totalPessoas };
+  }
+
+  // Desconto — respeita filtro de lojas
+  function getDesconto(ano, mes, lojasFilter = null) {
     let recs = descontos.filter(r => r.Ano === ano && r.Mes === mes);
-    if (loja) recs = recs.filter(r => r.Loja === loja);
+    if (lojasFilter && lojasFilter.size > 0) recs = recs.filter(r => lojasFilter.has(r.Loja));
     const totalDesconto = recs.reduce((s,r) => s + r.Desconto, 0);
     const totalBruto    = recs.reduce((s,r) => s + r.Bruto,    0);
     return { desconto: totalDesconto, bruto: totalBruto, pct: totalBruto > 0 ? totalDesconto/totalBruto*100 : 0 };
   }
 
   return (
-    <Ctx.Provider value={{ loading, getTicket, getDesconto }}>
+    <Ctx.Provider value={{ loading, getTicket, getTicketLoja, getDesconto }}>
       {children}
     </Ctx.Provider>
   );
