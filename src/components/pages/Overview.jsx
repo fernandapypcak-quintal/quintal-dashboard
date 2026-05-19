@@ -300,11 +300,11 @@ export default function Overview() {
 
       {/* ── TICKET MÉDIO + DESCONTO ── */}
       {periodo && (() => {
-        const tk     = getTicket(periodo.ano, periodo.mes);
-        const tkSal  = getTicket(periodo.ano, periodo.mes, null, 'CASA');
-        const tkDel  = getTicket(periodo.ano, periodo.mes, null, 'DELIVERY');
-        const tkAlm  = getTicket(periodo.ano, periodo.mes); // almoço via compradores salão
-        const dsc    = getDesconto(periodo.ano, periodo.mes);
+        const lojasF = filters.lojas;
+        const tk     = getTicket(periodo.ano, periodo.mes, null,       lojasF);
+        const tkSal  = getTicket(periodo.ano, periodo.mes, 'CASA',     lojasF);
+        const tkDel  = getTicket(periodo.ano, periodo.mes, 'DELIVERY', lojasF);
+        const dsc    = getDesconto(periodo.ano, periodo.mes, lojasF);
         if (tk.pessoas === 0) return null;
         return (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

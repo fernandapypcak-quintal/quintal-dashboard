@@ -25,7 +25,12 @@ export function TicketProvider({ children }) {
   function getTicket(ano, mes, canal = null, lojasFilter = null) {
     let recs = compradores.filter(r => r.Ano === ano && r.Mes === mes);
     if (canal) recs = recs.filter(r => r.Canal === canal);
-    if (lojasFilter && lojasFilter.size > 0) recs = recs.filter(r => lojasFilter.has(r.Loja));
+    if (lojasFilter && lojasFilter.size > 0) {
+      // Debug: log available lojas vs filter
+      const lojasDisponiveis = [...new Set(recs.map(r => r.Loja))];
+      console.log('[ticket] lojas disponíveis:', lojasDisponiveis, '| filtro:', [...lojasFilter]);
+      recs = recs.filter(r => lojasFilter.has(r.Loja));
+    }
     const totalPessoas = recs.reduce((s,r) => s + r.Pessoas, 0);
     const totalValor   = recs.reduce((s,r) => s + r.Valor,   0);
     return { ticket: totalPessoas > 0 ? totalValor/totalPessoas : 0, pessoas: totalPessoas, valor: totalValor };
