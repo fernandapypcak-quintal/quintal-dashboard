@@ -9,6 +9,27 @@ const ZIG_BASE  = 'https://api.zigcore.com.br/integration';
 const ZIG_REDE  = '46ec43b2-f955-453e-840d-02e68e40a9c2';
 const AS_URL    = 'https://script.google.com/macros/s/AKfycbyEoeYAWVUGc8n-_J61Sd91XDhkRPJOaVQnvUbk_-UcWyuaRtoyvFwtqMMcFq8_H80vwA/exec';
 
+const ALMOCO_LOJAS = {
+  'VILA MARIANA': '2026-04-01',
+  'CARINAS':      '2026-04-20',
+  'PAVAO':        '2026-05-11',
+  'CHACARA':      '2026-05-11',
+  'LAPA':         '2026-05-18',
+  'PERDIZES':     '2026-05-18',
+};
+
+const FERIADOS = [
+  '2026-01-01','2026-04-21','2026-05-01','2026-09-07',
+  '2026-10-12','2026-11-02','2026-11-15','2026-12-25'
+];
+
+function isFeriadoOuFimDeSemana(dataStr) {
+  const d = new Date(dataStr + 'T12:00:00');
+  const dow = d.getDay();
+  if (dow === 0 || dow === 6) return true;
+  return FERIADOS.includes(dataStr);
+}
+
 const MAPA_LOJAS = {
   'Quintal do Espeto Carinás':          { loja: 'CARINAS',       canal: 'CASA' },
   'Delivery Carinás':                   { loja: 'CARINAS',       canal: 'DELIVERY' },
@@ -88,12 +109,21 @@ export default function Hoje() {
           .then(d => ({ tipo: 'comp', dia: 'hoje', loja, data: d })),
         zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
           .then(d => ({ tipo: 'comp', dia: 'ontem', loja, data: d })),
+        // Almoço — só lojas CASA com almoço ativo
+        ...(MAPA_LOJAS[loja.name]?.canal === 'CASA' && ALMOCO_LOJAS[MAPA_LOJAS[loja.name]?.loja]
+          ? [
+              zigGet(`/erp/saida-produtos?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
+                .then(d => ({ tipo: 'almoco', dia: 'hoje', loja, data: d })),
+              zigGet(`/erp/saida-produtos?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
+                .then(d => ({ tipo: 'almoco', dia: 'ontem', loja, data: d })),
+            ]
+          : []),
       ]);
 
       const results = await Promise.allSettled(promises);
 
       // Processa resultados
-      const fatHoje = {}, fatOntem = {}, compradores = {}, compradoresOntem = {}, descontos = {};
+      const fatHoje = {}, fatOntem = {}, compradores = {}, compradoresOntem = {}, descontos = {}, almocoHoje = {}, almocoOntem = {};
 
       results.forEach(r => {
         if (r.status !== 'fulfilled') return;
@@ -111,6 +141,23 @@ export default function Hoje() {
             target[key].total += v;
             if (mapa.canal === 'CASA') target[key].casa += v;
             else target[key].delivery += v;
+          });
+        }
+
+        if (tipo === 'almoco') {
+          const target = dia === 'hoje' ? almocoHoje : almocoOntem;
+          const mapa   = MAPA_LOJAS[loja.name];
+          if (!mapa) return;
+          const dataStr = dia === 'hoje' ? dtHoje : dtOntem;
+          if (isFeriadoOuFimDeSemana(dataStr)) return;
+          if (!data?.length) return;
+          data.forEach(item => {
+            const txDate = String(item.transactionDate || '');
+            const horaLocal = (parseInt(txDate.slice(11,13), 10) - 3 + 24) % 24;
+            if (horaLocal < 11 || horaLocal >= 15) return;
+            const valor = ((item.unitValue||0)*(item.count||1) - (item.discountValue||0)) / 100;
+            if (valor <= 0) return;
+            target[key] = (target[key] || 0) + valor;
           });
         }
 
@@ -135,11 +182,13 @@ export default function Hoje() {
         const h  = fatHoje[loja]   || { total: 0, casa: 0, delivery: 0 };
         const o  = fatOntem[loja]  || { total: 0, casa: 0, delivery: 0 };
         const c  = compradores[loja]       || { total: 0, pessoas: 0 };
-        const co = compradoresOntem[loja]  || { total: 0, pessoas: 0 };
+        const co  = compradoresOntem[loja] || { total: 0, pessoas: 0 };
+        const ah  = almocoHoje[loja]        || 0;
+        const ao  = almocoOntem[loja]       || 0;
         const varOntem = o.total > 0 ? (h.total - o.total) / o.total * 100 : null;
         const ticket       = c.pessoas  > 0 ? c.total  / c.pessoas  : 0;
         const ticketOntem  = co.pessoas > 0 ? co.total / co.pessoas : 0;
-        return { loja, hoje: h, ontem: o, varOntem, ticket, ticketOntem, pessoas: c.pessoas, pessoasOntem: co.pessoas };
+        return { loja, hoje: h, ontem: o, varOntem, ticket, ticketOntem, pessoas: c.pessoas, pessoasOntem: co.pessoas, almocoHoje: ah, almocoOntem: ao };
       }).filter(l => l.hoje.total > 0 || l.ontem.total > 0) // keep all lojas with any data
         .sort((a,b) => b.hoje.total - a.hoje.total); // default sort by hoje
 
@@ -159,7 +208,9 @@ export default function Hoje() {
         ? porLojaOntemComp.reduce((s,l) => s + l.ticket * l.pessoas, 0) / totalPessoasOntem : 0;
       const varTotal = totalOntem > 0 ? (totalHoje - totalOntem) / totalOntem * 100 : null;
 
-      setDados({ porLoja, totalHoje, totalOntem, varTotal,
+      const totalAlmocoHoje  = Object.values(almocoHoje).reduce((s,v) => s+v, 0);
+      const totalAlmocoOntem = Object.values(almocoOntem).reduce((s,v) => s+v, 0);
+      setDados({ porLoja, totalHoje, totalOntem, varTotal, totalAlmocoHoje, totalAlmocoOntem,
         ticketMedioHoje, ticketMedioOntem,
         totalPessoasHoje, totalPessoasOntem,
         dtHoje, dtOntem });
@@ -275,6 +326,15 @@ export default function Hoje() {
                 {formatBRL(dados.porLoja.reduce((s,l) => s+(mostraDia==='hoje'?l.hoje.delivery:l.ontem.delivery), 0), true)}
               </p>
             </div>
+            {(mostraDia === 'hoje' ? dados.totalAlmocoHoje : dados.totalAlmocoOntem) > 0 && (
+              <div className="bg-white border border-surface-border rounded-2xl p-4">
+                <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Almoço</p>
+                <p className="text-2xl font-bold font-display" style={{color:'#0D9488'}}>
+                  {formatBRL(mostraDia === 'hoje' ? dados.totalAlmocoHoje : dados.totalAlmocoOntem, true)}
+                </p>
+                <p className="text-xs text-zinc-400 mt-1">11h–15h · seg–sex</p>
+              </div>
+            )}
           </div>
 
           {/* Tabela por loja */}
@@ -340,6 +400,11 @@ export default function Hoje() {
                             ) : '—'}
                           </td>
                         )}
+                        <td className="py-3 px-4 text-right font-mono font-semibold" style={{color:'#0D9488'}}>
+                          {(mostraDia === 'hoje' ? l.almocoHoje : l.almocoOntem) > 0
+                            ? formatBRL(mostraDia === 'hoje' ? l.almocoHoje : l.almocoOntem, true)
+                            : <span className="text-zinc-300">—</span>}
+                        </td>
                         <td className="py-3 px-4 text-right font-mono text-zinc-600">
                           {(mostraDia === 'hoje' ? l.ticket : l.ticketOntem) > 0 ? formatBRL(mostraDia === 'hoje' ? l.ticket : l.ticketOntem) : '—'}
                         </td>
@@ -372,6 +437,11 @@ export default function Hoje() {
                         )}
                       </td>
                     )}
+                    <td className="py-3 px-4 text-right font-mono font-semibold" style={{color:'#0D9488'}}>
+                      {(mostraDia === 'hoje' ? dados.totalAlmocoHoje : dados.totalAlmocoOntem) > 0
+                        ? formatBRL(mostraDia === 'hoje' ? dados.totalAlmocoHoje : dados.totalAlmocoOntem, true)
+                        : '—'}
+                    </td>
                     <td className="py-3 px-4 text-right font-mono text-zinc-600">
                       {(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) > 0 ? formatBRL(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) : '—'}
                     </td>
