@@ -286,7 +286,8 @@ export default function Hoje() {
       {dados && (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Faturamento Total */}
             <div className="bg-white border border-surface-border rounded-2xl p-4">
               <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
                 Faturamento {mostraDia === 'hoje' ? 'Hoje' : 'Ontem'}
@@ -300,36 +301,49 @@ export default function Hoje() {
                 </p>
               )}
             </div>
-            <div className="bg-white border border-surface-border rounded-2xl p-4">
-              <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Ticket Médio</p>
-              <p className="text-2xl font-bold font-display text-brand-black">
-                {(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) > 0 ? formatBRL(mostraDia === 'hoje' ? dados.ticketMedioHoje : dados.ticketMedioOntem) : '—'}
-              </p>
-              {dados.totalPessoas > 0 && (
-                <p className="text-xs text-zinc-400 mt-1">{dados.totalPessoas} pessoas</p>
-              )}
-            </div>
+
+            {/* Salão */}
             <div className="bg-white border border-surface-border rounded-2xl p-4">
               <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Salão</p>
               <p className="text-2xl font-bold font-display text-brand-black">
                 {formatBRL(dados.porLoja.reduce((s,l) => s+(mostraDia==='hoje'?l.hoje.casa:l.ontem.casa), 0), true)}
               </p>
-              <p className="text-xs text-zinc-400 mt-1">
-                {dados.totalHoje > 0
-                  ? (dados.porLoja.reduce((s,l)=>s+(mostraDia==='hoje'?l.hoje.casa:l.ontem.casa),0) /
-                    (mostraDia==='hoje'?dados.totalHoje:dados.totalOntem)*100).toFixed(1)+'%'
-                  : '—'} do total
-              </p>
+              {(() => {
+                const tkSal = dados.porLoja.filter(l => (mostraDia==='hoje'?l.pessoas:l.pessoasOntem) > 0 && (mostraDia==='hoje'?l.hoje.casa:l.ontem.casa) > 0);
+                const totalPessoasSal = tkSal.reduce((s,l) => s+(mostraDia==='hoje'?l.pessoas:l.pessoasOntem), 0);
+                const totalValSal    = tkSal.reduce((s,l) => s+(mostraDia==='hoje'?l.hoje.casa:l.ontem.casa), 0);
+                const tkMedSal = totalPessoasSal > 0 ? totalValSal/totalPessoasSal : 0;
+                return tkMedSal > 0 ? (
+                  <p className="text-xs text-zinc-400 mt-1">
+                    ticket {formatBRL(tkMedSal)} · {totalPessoasSal} pessoas
+                  </p>
+                ) : null;
+              })()}
             </div>
+
+            {/* Delivery */}
             <div className="bg-white border border-surface-border rounded-2xl p-4">
               <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Delivery</p>
               <p className="text-2xl font-bold font-display text-brand-black">
                 {formatBRL(dados.porLoja.reduce((s,l) => s+(mostraDia==='hoje'?l.hoje.delivery:l.ontem.delivery), 0), true)}
               </p>
+              {(() => {
+                const tkDel = dados.porLoja.filter(l => (mostraDia==='hoje'?l.hoje.delivery:l.ontem.delivery) > 0);
+                const totalPessoasDel = tkDel.reduce((s,l) => s+(mostraDia==='hoje'?l.pessoas:l.pessoasOntem), 0);
+                const totalValDel    = tkDel.reduce((s,l) => s+(mostraDia==='hoje'?l.hoje.delivery:l.ontem.delivery), 0);
+                const tkMedDel = totalPessoasDel > 0 ? totalValDel/totalPessoasDel : 0;
+                return tkMedDel > 0 ? (
+                  <p className="text-xs text-zinc-400 mt-1">
+                    ticket {formatBRL(tkMedDel)} · {totalPessoasDel} pedidos
+                  </p>
+                ) : null;
+              })()}
             </div>
+
+            {/* Almoço */}
             {(mostraDia === 'hoje' ? dados.totalAlmocoHoje : dados.totalAlmocoOntem) > 0 && (
-              <div className="bg-white border border-surface-border rounded-2xl p-4">
-                <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Almoço</p>
+              <div className="bg-white border border-surface-border rounded-2xl p-4" style={{borderLeftColor:'#0D9488', borderLeftWidth:'3px'}}>
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{color:'#0D9488'}}>Almoço</p>
                 <p className="text-2xl font-bold font-display" style={{color:'#0D9488'}}>
                   {formatBRL(mostraDia === 'hoje' ? dados.totalAlmocoHoje : dados.totalAlmocoOntem, true)}
                 </p>
@@ -338,7 +352,7 @@ export default function Hoje() {
             )}
           </div>
 
-          {/* Tabela por loja */}
+{/* Tabela por loja */}
           <div className="bg-white border border-surface-border rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
               <h3 className="font-semibold text-brand-black">Por Loja — {mostraDia === 'hoje' ? 'Hoje' : 'Ontem'}</h3>
@@ -354,6 +368,7 @@ export default function Hoje() {
                     <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Total</th>
                     <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Salão</th>
                     <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Delivery</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold uppercase tracking-wider" style={{color:'#0D9488'}}>Almoço</th>
                     {mostraDia === 'hoje' && <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">vs Ontem</th>}
                     <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Médio</th>
                     <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Pessoas</th>
