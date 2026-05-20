@@ -85,10 +85,10 @@ export default function Hoje() {
             .then(d => ({ tipo:'comp', dia:'hoje', loja, mapa, data:d })),
           zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
             .then(d => ({ tipo:'comp', dia:'ontem', loja, mapa, data:d })),
-          zigGet(`/erp/eventos?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo:'eventos', dia:'hoje', loja, mapa, data:d })),
-          zigGet(`/erp/eventos?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo:'eventos', dia:'ontem', loja, mapa, data:d })),
+          zigGet(`/erp/checkins?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
+            .then(d => ({ tipo:'checkin', dia:'hoje', loja, mapa, data:d })),
+          zigGet(`/erp/checkins?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
+            .then(d => ({ tipo:'checkin', dia:'ontem', loja, mapa, data:d })),
         ];
       });
 
@@ -117,7 +117,6 @@ export default function Hoje() {
         }
 
         if (tipo === 'comp') {
-          // Mantém como fallback caso eventos não tenha clientes
           data.forEach(item => {
             const v = (item.productsValue || 0) / 100;
             if (v <= 0) return;
@@ -125,20 +124,19 @@ export default function Hoje() {
           });
         }
 
-        if (tipo === 'eventos') {
-          console.log('[eventos]', loja.name, dia, 'registros:', data.length, data.length > 0 ? JSON.stringify(data[0]).slice(0,200) : '');
-          // Usa qtd de clientes do evento para ticket médio
-          data.forEach(item => {
-            const clientes = item.clientCount || item.checkInCount ||
-                             item.guestCount  || item.peopleCount  ||
-                             item.clients     || item.guests       || 0;
-            target[lj].pessoas += Number(clientes);
-          });
-          // Log para identificar o campo correto na primeira execução
-          if (data.length > 0) {
-            console.log('[eventos] campos disponíveis:', Object.keys(data[0]));
-            console.log('[eventos] exemplo:', JSON.stringify(data[0]).slice(0, 300));
+        if (tipo === 'checkin') {
+          // Log primeira vez para ver estrutura
+          if (data.length > 0 && !window._checkinLogged) {
+            window._checkinLogged = true;
+            console.log('[checkin] campos:', Object.keys(data[0]));
+            console.log('[checkin] exemplo:', JSON.stringify(data[0]).slice(0, 400));
           }
+          data.forEach(item => {
+            // Conta 1 por registro ou usa campo de quantidade se existir
+            const qtd = item.count || item.quantity || item.pessoas ||
+                        item.guestCount || item.clientCount || 1;
+            target[lj].pessoas += Number(qtd);
+          });
         }
       });
 
