@@ -38,7 +38,11 @@ function fmtHora() {
 }
 async function zigGet(ep) {
   const r = await fetch(ZIG_BASE + ep, { headers: { Authorization: ZIG_TOKEN } });
-  return r.ok ? r.json() : null;
+  if (!r.ok) {
+    console.warn('[ZIG] erro', r.status, ep.slice(0,60));
+    return null;
+  }
+  return r.json();
 }
 
 const LOJA_COLORS = {
@@ -81,6 +85,10 @@ export default function Hoje() {
             .then(d => ({ tipo:'comp', dia:'hoje', loja, mapa, data:d })),
           zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
             .then(d => ({ tipo:'comp', dia:'ontem', loja, mapa, data:d })),
+          zigGet(`/erp/eventos?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
+            .then(d => ({ tipo:'eventos', dia:'hoje', loja, mapa, data:d })),
+          zigGet(`/erp/eventos?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
+            .then(d => ({ tipo:'eventos', dia:'ontem', loja, mapa, data:d })),
         ];
       });
 
@@ -98,10 +106,9 @@ export default function Hoje() {
         if (!target[lj]) target[lj] = emptyLoja();
 
         if (tipo === 'fat') {
-          const seenEvents = new Set();
+          // Cada registro = 1 método de pagamento de 1 evento
+          // Soma tudo — o total por evento é a soma dos métodos de pagamento
           data.forEach(item => {
-            const eid = item.eventId || item.id || null;
-            if (eid) { if (seenEvents.has(eid)) return; seenEvents.add(eid); }
             const v = (item.value || 0) / 100;
             if (v <= 0) return;
             if (mapa.canal === 'CASA')     target[lj].salao    += v;
@@ -110,12 +117,28 @@ export default function Hoje() {
         }
 
         if (tipo === 'comp') {
+          // Mantém como fallback caso eventos não tenha clientes
           data.forEach(item => {
             const v = (item.productsValue || 0) / 100;
             if (v <= 0) return;
-            target[lj].pessoas   += 1;
             target[lj].valorComp += v;
           });
+        }
+
+        if (tipo === 'eventos') {
+          console.log('[eventos]', loja.name, dia, 'registros:', data.length, data.length > 0 ? JSON.stringify(data[0]).slice(0,200) : '');
+          // Usa qtd de clientes do evento para ticket médio
+          data.forEach(item => {
+            const clientes = item.clientCount || item.checkInCount ||
+                             item.guestCount  || item.peopleCount  ||
+                             item.clients     || item.guests       || 0;
+            target[lj].pessoas += Number(clientes);
+          });
+          // Log para identificar o campo correto na primeira execução
+          if (data.length > 0) {
+            console.log('[eventos] campos disponíveis:', Object.keys(data[0]));
+            console.log('[eventos] exemplo:', JSON.stringify(data[0]).slice(0, 300));
+          }
         }
       });
 
