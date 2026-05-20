@@ -38,11 +38,7 @@ function fmtHora() {
 }
 async function zigGet(ep) {
   const r = await fetch(ZIG_BASE + ep, { headers: { Authorization: ZIG_TOKEN } });
-  if (!r.ok) {
-    console.warn('[ZIG] erro', r.status, ep.slice(0,60));
-    return null;
-  }
-  return r.json();
+  return r.ok ? r.json() : null;
 }
 
 const LOJA_COLORS = {
@@ -85,10 +81,7 @@ export default function Hoje() {
             .then(d => ({ tipo:'comp', dia:'hoje', loja, mapa, data:d })),
           zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
             .then(d => ({ tipo:'comp', dia:'ontem', loja, mapa, data:d })),
-          zigGet(`/erp/checkins?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo:'checkin', dia:'hoje', loja, mapa, data:d })),
-          zigGet(`/erp/checkins?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo:'checkin', dia:'ontem', loja, mapa, data:d })),
+
         ];
       });
 
@@ -117,25 +110,12 @@ export default function Hoje() {
         }
 
         if (tipo === 'comp') {
+          // 1 registro = 1 comprador (melhor aproximação disponível na API)
           data.forEach(item => {
             const v = (item.productsValue || 0) / 100;
             if (v <= 0) return;
+            target[lj].pessoas   += 1;
             target[lj].valorComp += v;
-          });
-        }
-
-        if (tipo === 'checkin') {
-          // Log primeira vez para ver estrutura
-          if (data.length > 0 && !window._checkinLogged) {
-            window._checkinLogged = true;
-            console.log('[checkin] campos:', Object.keys(data[0]));
-            console.log('[checkin] exemplo:', JSON.stringify(data[0]).slice(0, 400));
-          }
-          data.forEach(item => {
-            // Conta 1 por registro ou usa campo de quantidade se existir
-            const qtd = item.count || item.quantity || item.pessoas ||
-                        item.guestCount || item.clientCount || 1;
-            target[lj].pessoas += Number(qtd);
           });
         }
       });
