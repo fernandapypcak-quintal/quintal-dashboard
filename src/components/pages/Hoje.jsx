@@ -145,19 +145,20 @@ export default function Hoje() {
         }
 
         if (tipo === 'almoco') {
-          const target = dia === 'hoje' ? almocoHoje : almocoOntem;
-          const mapa   = MAPA_LOJAS[loja.name];
-          if (!mapa) return;
+          const target  = dia === 'hoje' ? almocoHoje : almocoOntem;
+          const mapa    = MAPA_LOJAS[loja.name];
+          if (!mapa || mapa.canal !== 'CASA') return; // só salão
           const dataStr = dia === 'hoje' ? dtHoje : dtOntem;
           if (isFeriadoOuFimDeSemana(dataStr)) return;
           if (!data?.length) return;
           data.forEach(item => {
-            const txDate = String(item.transactionDate || '');
+            const txDate    = String(item.transactionDate || '');
             const horaLocal = (parseInt(txDate.slice(11,13), 10) - 3 + 24) % 24;
             if (horaLocal < 11 || horaLocal >= 15) return;
             const valor = ((item.unitValue||0)*(item.count||1) - (item.discountValue||0)) / 100;
             if (valor <= 0) return;
-            target[key] = (target[key] || 0) + valor;
+            const lojaKey = mapa.loja; // ← chave correta pelo nome da loja
+            target[lojaKey] = (target[lojaKey] || 0) + valor;
           });
         }
 
