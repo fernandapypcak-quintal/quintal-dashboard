@@ -62,7 +62,7 @@ const LOJA_COLORS = {
 };
 
 function emptyLoja() {
-  return { salao: 0, delivery: 0, almoco: 0, pessoas: 0, valorComp: 0 };
+  return { salao: 0, delivery: 0, almoco: 0, almocoEventIds: null, pessoas: 0, valorComp: 0 };
 }
 
 export default function Hoje() {
@@ -124,7 +124,15 @@ export default function Hoje() {
         if (!target[lj]) target[lj] = emptyLoja();
 
         if (tipo === 'fat') {
+          // De-duplica por eventId — cada evento pode ter múltiplos registros
+          // (um por método de pagamento). Soma apenas uma vez por eventId.
+          const seenEvents = new Set();
           data.forEach(item => {
+            const eid = item.eventId || item.id || null;
+            if (eid) {
+              if (seenEvents.has(eid)) return;
+              seenEvents.add(eid);
+            }
             const v = (item.value || 0) / 100;
             if (v <= 0) return;
             if (mapa.canal === 'CASA')     target[lj].salao    += v;
@@ -144,29 +152,51 @@ export default function Hoje() {
         if (tipo === 'almoco' && mapa.canal === 'CASA') {
           const dataStr = dia === 'hoje' ? fmtDate(new Date()) : fmtDate((() => { const d = new Date(); d.setDate(d.getDate()-1); return d; })());
           if (isFeriadoOuFimDeSemana(dataStr)) return;
-          let dbgTotal = 0, dbgFiltrado = 0;
+          // Coleta eventIds com itens vendidos entre 11h-15h (horário Brasília)
+          // O valor do almoço será buscado do /faturamento para incluir taxa de serviço
+          if (!target[lj].almocoEventIds) target[lj].almocoEventIds = new Set();
           data.forEach(item => {
             const txDate    = String(item.transactionDate || '');
-            // transactionDate vem em UTC — converte pra horário de Brasília (UTC-3)
-            const horaUTC   = parseInt(txDate.slice(11,13), 10);
-            const minUTC    = parseInt(txDate.slice(14,16), 10);
-            const horaLocal = (horaUTC - 3 + 24) % 24;
-            // Usa totalValue se disponível (já inclui tudo), senão calcula manualmente
-            const v = item.totalValue != null
-              ? (item.totalValue || 0) / 100
-              : ((item.unitValue||0)*(item.count||1) - (item.discountValue||0)) / 100;
-            dbgTotal += v;
+            const horaLocal = (parseInt(txDate.slice(11,13), 10) - 3 + 24) % 24;
             if (horaLocal < 11 || horaLocal >= 15) return;
-            if (v <= 0) return;
-            dbgFiltrado += v;
-            target[lj].almoco += v;
+            const eid = String(item.eventId || item.orderId || '');
+            if (eid) target[lj].almocoEventIds.add(eid);
           });
-          if (dia === 'hoje' && lj === 'CARINAS') {
-            console.log('[almoco debug] CARINAS hoje: total produtos='+dbgTotal.toFixed(2)+' filtrado 11-15h='+dbgFiltrado.toFixed(2));
-            const sample = data.slice(0,3).map(i => String(i.transactionDate||'').slice(0,16));
-            console.log('[almoco debug] sample txDates:', sample);
-          }
         }
+      });
+
+      // Cruza eventIds do almoço com faturamento para pegar valor correto
+      // fat_events[dia][loja] = { eventId: value }
+      // Re-processa results para construir mapa de eventos de faturamento
+      const fatEventosHoje  = {}; // { loja: { eventId: totalValue } }
+      const fatEventosOntem = {};
+      results.forEach(r => {
+        if (r.status !== 'fulfilled') return;
+        const { tipo, dia, mapa, data } = r.value;
+        if (tipo !== 'fat' || !data?.length) return;
+        const target = dia === 'hoje' ? fatEventosHoje : fatEventosOntem;
+        const lj = mapa.loja;
+        if (!target[lj]) target[lj] = {};
+        if (mapa.canal !== 'CASA') return; // almoço só no salão
+        data.forEach(item => {
+          const eid = String(item.eventId || '');
+          if (!eid) return;
+          if (!target[lj][eid]) target[lj][eid] = 0;
+          target[lj][eid] += (item.value || 0) / 100;
+        });
+      });
+
+      // Calcula valor de almoço somando faturamento dos eventIds identificados
+      ['hoje','ontem'].forEach(dia => {
+        const d_data   = dia === 'hoje' ? hoje_data  : ontem_data;
+        const fatEvts  = dia === 'hoje' ? fatEventosHoje : fatEventosOntem;
+        Object.keys(d_data).forEach(lj => {
+          const eids = d_data[lj].almocoEventIds;
+          if (!eids || !fatEvts[lj]) return;
+          let total = 0;
+          eids.forEach(eid => { total += fatEvts[lj][eid] || 0; });
+          d_data[lj].almoco = total;
+        });
       });
 
       // Consolida porLoja
