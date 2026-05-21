@@ -30,6 +30,13 @@ const MAPA_LOJAS = {
   'Delivery Santana':                   { loja: 'SANTANA',       canal: 'DELIVERY' },
 };
 
+// Métodos de pagamento que NÃO entram no faturamento de receita
+// (bônus e notas manuais/serviço são excluídos, conforme tela financeiro da Zig)
+const PAGAMENTOS_EXCLUIDOS = new Set([
+  'BÔNUS',
+  'NOTAS MANUAIS + SERVIÇO',
+]);
+
 function fmtDate(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
@@ -74,13 +81,13 @@ export default function Hoje() {
         const mapa = MAPA_LOJAS[loja.name];
         return [
           zigGet(`/erp/faturamento?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'fat', dia: 'hoje', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
+            .then(d => ({ tipo: 'fat', dia: 'hoje', lojaId: loja.id, mapa, data: d })),
           zigGet(`/erp/faturamento?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'fat', dia: 'ontem', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
+            .then(d => ({ tipo: 'fat', dia: 'ontem', lojaId: loja.id, mapa, data: d })),
           zigGet(`/erp/compradores?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'comp', dia: 'hoje', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
+            .then(d => ({ tipo: 'comp', dia: 'hoje', lojaId: loja.id, mapa, data: d })),
           zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'comp', dia: 'ontem', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
+            .then(d => ({ tipo: 'comp', dia: 'ontem', lojaId: loja.id, mapa, data: d })),
         ];
       });
 
@@ -91,21 +98,8 @@ export default function Hoje() {
 
       results.forEach(r => {
         if (r.status !== 'fulfilled') return;
-        const { tipo, dia, lojaId, lojaNome, mapa, data } = r.value;
+        const { tipo, dia, lojaId, mapa, data } = r.value;
         if (!data?.length) return;
-
-        // DEBUG PAVÃO: mostra todos os registros brutos com lojaId
-        if (lojaNome === 'Quintal do Espeto Pavão' && dia === 'ontem' && tipo === 'fat') {
-          console.log(`[PAVÃO DEBUG] ${data.length} registros retornados para loja ${lojaId}`);
-          data.forEach((item, i) => {
-            console.log(`  [${i}] paymentId=${item.paymentId} paymentName="${item.paymentName}" value=${item.value}`);
-          });
-          const totalBruto = data.reduce((s, i) => s + (i.value || 0) / 100, 0);
-          const totalFiltrado = data.filter(i => i.lojaId === lojaId).reduce((s, i) => s + (i.value || 0) / 100, 0);
-          console.log(`[PAVÃO DEBUG] Total bruto: R$${totalBruto.toFixed(2)} | Total filtrado (lojaId correto): R$${totalFiltrado.toFixed(2)}`);
-          
-        }
-       
 
         const target = dia === 'hoje' ? hoje_data : ontem_data;
         const lj = mapa.loja;
@@ -114,6 +108,7 @@ export default function Hoje() {
         if (tipo === 'fat') {
           data
             .filter(item => !item.lojaId || item.lojaId === lojaId)
+            .filter(item => !PAGAMENTOS_EXCLUIDOS.has(item.paymentName))
             .forEach(item => {
               const v = (item.value || 0) / 100;
               if (v <= 0) return;
@@ -186,6 +181,7 @@ export default function Hoje() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4 max-w-7xl mx-auto pb-20 lg:pb-6">
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2">
