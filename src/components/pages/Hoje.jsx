@@ -66,64 +66,65 @@ export default function Hoje() {
       const dtHoje  = fmtDate(hoje);
       const dtOntem = fmtDate(ontem);
 
+      // Busca lista de lojas para montar o mapa id → {loja, canal}
       const lojas = await zigGet(`/erp/lojas?rede=${ZIG_REDE}`);
       if (!lojas) throw new Error('Erro ao buscar lojas');
-      const lojasMapeadas = lojas.filter(l => MAPA_LOJAS[l.name]);
 
-      // DEBUG: ver IDs das lojas retornados pela API
-      console.log('[debug] Lojas mapeadas:', JSON.stringify(lojasMapeadas.map(l => ({ id: l.id, name: l.name })), null, 2));
-
-      const promises = lojasMapeadas.flatMap(loja => {
-        const mapa = MAPA_LOJAS[loja.name];
-        return [
-          zigGet(`/erp/faturamento?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo:'fat', dia:'hoje', loja, mapa, data:d })),
-          zigGet(`/erp/faturamento?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo:'fat', dia:'ontem', loja, mapa, data:d })),
-          zigGet(`/erp/compradores?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo:'comp', dia:'hoje', loja, mapa, data:d })),
-          zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo:'comp', dia:'ontem', loja, mapa, data:d })),
-        ];
+      // Mapa de lojaId (UUID) → { loja, canal }
+      const mapaId = {};
+      lojas.forEach(l => {
+        if (MAPA_LOJAS[l.name]) mapaId[l.id] = MAPA_LOJAS[l.name];
       });
 
-      const results = await Promise.allSettled(promises);
+      // Uma única chamada por endpoint/dia — a API retorna tudo da rede
+      // Usamos a primeira loja mapeada apenas para satisfazer o parâmetro obrigatório
+      // O filtro real é feito pelo lojaId dentro de cada registro
+      const primeiroId = Object.keys(mapaId)[0];
+
+      const [fatHoje, fatOntem, compHoje, compOntem] = await Promise.all([
+        zigGet(`/erp/faturamento?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${primeiroId}`),
+        zigGet(`/erp/faturamento?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${primeiroId}`),
+        zigGet(`/erp/compradores?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${primeiroId}`),
+        zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${primeiroId}`),
+      ]);
 
       const hoje_data  = {};
       const ontem_data = {};
 
-      results.forEach(r => {
-        if (r.status !== 'fulfilled') return;
-        const { tipo, dia, loja, mapa, data } = r.value;
-        if (!data?.length) return;
-        const target = dia === 'hoje' ? hoje_data : ontem_data;
-        const lj = mapa.loja;
-        if (!target[lj]) target[lj] = emptyLoja();
+      // Processa faturamento — filtra pelo lojaId de cada item
+      function processarFat(itens, target) {
+        if (!itens?.length) return;
+        itens.forEach(item => {
+          const mapa = mapaId[item.lojaId];
+          if (!mapa) return; // loja não mapeada, ignora
+          const lj = mapa.loja;
+          if (!target[lj]) target[lj] = emptyLoja();
+          const v = (item.value || 0) / 100;
+          if (v <= 0) return;
+          if (mapa.canal === 'CASA')     target[lj].salao    += v;
+          if (mapa.canal === 'DELIVERY') target[lj].delivery += v;
+        });
+      }
 
-        if (tipo === 'fat') {
-          const total = data.reduce((s,i) => s + (i.value||0)/100, 0);
-          console.log(`[fat] ${dia} ${loja.name} (${mapa.canal}) → ${data.length} registros, total R$${total.toFixed(2)}`);
-          data.forEach(item => {
-            const v = (item.value || 0) / 100;
-            if (v <= 0) return;
-            if (mapa.canal === 'CASA')     target[lj].salao    += v;
-            if (mapa.canal === 'DELIVERY') target[lj].delivery += v;
-          });
-        }
+      // Processa compradores — filtra pelo lojaId de cada item
+      function processarComp(itens, target) {
+        if (!itens?.length) return;
+        itens.forEach(item => {
+          const mapa = mapaId[item.lojaId];
+          if (!mapa) return;
+          const lj = mapa.loja;
+          if (!target[lj]) target[lj] = emptyLoja();
+          const v = (item.productsValue || 0) / 100;
+          if (v <= 0) return;
+          target[lj].pessoas   += 1;
+          target[lj].valorComp += v;
+        });
+      }
 
-        if (tipo === 'comp') {
-          data.forEach(item => {
-            const v = (item.productsValue || 0) / 100;
-            if (v <= 0) return;
-            target[lj].pessoas   += 1;
-            target[lj].valorComp += v;
-          });
-        }
-      });
-
-      // DEBUG: ver o que acumulou para PAVÃO especificamente
-      console.log('[debug] PAVÃO hoje_data:', JSON.stringify(hoje_data['PAVÃO'], null, 2));
-      console.log('[debug] PAVÃO ontem_data:', JSON.stringify(ontem_data['PAVÃO'], null, 2));
+      processarFat(fatHoje,   hoje_data);
+      processarFat(fatOntem,  ontem_data);
+      processarComp(compHoje,  hoje_data);
+      processarComp(compOntem, ontem_data);
 
       const todasLojas = [...new Set([...Object.keys(hoje_data), ...Object.keys(ontem_data)])].sort();
 
