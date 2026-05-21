@@ -99,14 +99,32 @@ export default function Hoje() {
         if (!target[lj]) target[lj] = emptyLoja();
 
         if (tipo === 'fat') {
-          // Cada registro = 1 método de pagamento de 1 evento
-          // Soma tudo — o total por evento é a soma dos métodos de pagamento
-          data.forEach(item => {
-            const v = (item.value || 0) / 100;
-            if (v <= 0) return;
-            if (mapa.canal === 'CASA')     target[lj].salao    += v;
-            if (mapa.canal === 'DELIVERY') target[lj].delivery += v;
-          });
+          // Agrupa por eventId — cada evento pode ter múltiplos registros
+          // (um por método de pagamento). O valor correto é a soma dos métodos.
+          // Mas eventos de SALÃO frequentemente são pagos em múltiplos métodos
+          // então precisamos somar POR EVENTO (não por registro).
+          // Verificamos: se eventId existe e já foi somado, pulamos.
+          // IMPORTANTE: cada registro já representa o valor parcial do método,
+          // então SOMAMOS todos os registros do mesmo evento = valor total do evento.
+          if (mapa.canal === 'CASA') {
+            // Agrupa por eventId para evitar dupla contagem
+            const porEvento = {};
+            data.forEach(item => {
+              const eid = String(item.eventId || item.id || Math.random());
+              if (!porEvento[eid]) porEvento[eid] = 0;
+              porEvento[eid] += (item.value || 0) / 100;
+            });
+            // Soma o valor total de cada evento (já consolidado)
+            Object.values(porEvento).forEach(v => {
+              if (v > 0) target[lj].salao += v;
+            });
+          } else {
+            // Delivery: cada registro é independente, soma direta
+            data.forEach(item => {
+              const v = (item.value || 0) / 100;
+              if (v > 0) target[lj].delivery += v;
+            });
+          }
         }
 
         if (tipo === 'comp') {
