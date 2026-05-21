@@ -50,8 +50,11 @@ const LOJA_COLORS = {
 function emptyLoja() {
   return { salao: 0, delivery: 0, pessoas: 0, valorComp: 0 };
 }
-
+// logo após o results.forEach, antes do setDados
+console.log('PAVÃO hoje_data:', JSON.stringify(hoje_data['PAVÃO'], null, 2));
+console.log('PAVÃO ontem_data:', JSON.stringify(ontem_data['PAVÃO'], null, 2));
 export default function Hoje() {
+  
   const [dados,     setDados]     = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [ultimaAtu, setUltimaAtu] = useState(null);
