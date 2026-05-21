@@ -66,24 +66,21 @@ export default function Hoje() {
       const dtHoje  = fmtDate(hoje);
       const dtOntem = fmtDate(ontem);
 
-      // Busca lojas e monta mapa id → { loja, canal }
       const lojas = await zigGet(`/erp/lojas?rede=${ZIG_REDE}`);
       if (!lojas) throw new Error('Erro ao buscar lojas');
       const lojasMapeadas = lojas.filter(l => MAPA_LOJAS[l.name]);
 
-      // Faz uma chamada de faturamento e compradores por loja, para hoje e ontem
-      // Usa Promise.allSettled para não deixar uma falha derrubar tudo
       const promises = lojasMapeadas.flatMap(loja => {
         const mapa = MAPA_LOJAS[loja.name];
         return [
           zigGet(`/erp/faturamento?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'fat', dia: 'hoje', lojaId: loja.id, mapa, data: d })),
+            .then(d => ({ tipo: 'fat', dia: 'hoje', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
           zigGet(`/erp/faturamento?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'fat', dia: 'ontem', lojaId: loja.id, mapa, data: d })),
+            .then(d => ({ tipo: 'fat', dia: 'ontem', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
           zigGet(`/erp/compradores?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'comp', dia: 'hoje', lojaId: loja.id, mapa, data: d })),
+            .then(d => ({ tipo: 'comp', dia: 'hoje', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
           zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'comp', dia: 'ontem', lojaId: loja.id, mapa, data: d })),
+            .then(d => ({ tipo: 'comp', dia: 'ontem', lojaId: loja.id, lojaNome: loja.name, mapa, data: d })),
         ];
       });
 
@@ -94,15 +91,25 @@ export default function Hoje() {
 
       results.forEach(r => {
         if (r.status !== 'fulfilled') return;
-        const { tipo, dia, lojaId, mapa, data } = r.value;
+        const { tipo, dia, lojaId, lojaNome, mapa, data } = r.value;
         if (!data?.length) return;
+
+        // DEBUG PAVÃO: mostra todos os registros brutos com lojaId
+        if (lojaNome === 'Quintal do Espeto Pavão' && dia === 'ontem' && tipo === 'fat') {
+          console.log(`[PAVÃO DEBUG] ${data.length} registros retornados para loja ${lojaId}`);
+          data.forEach((item, i) => {
+            console.log(`  [${i}] lojaId=${item.lojaId} value=${item.value} eventDate=${item.eventDate}`);
+          });
+          const totalBruto = data.reduce((s, i) => s + (i.value || 0) / 100, 0);
+          const totalFiltrado = data.filter(i => i.lojaId === lojaId).reduce((s, i) => s + (i.value || 0) / 100, 0);
+          console.log(`[PAVÃO DEBUG] Total bruto: R$${totalBruto.toFixed(2)} | Total filtrado (lojaId correto): R$${totalFiltrado.toFixed(2)}`);
+        }
 
         const target = dia === 'hoje' ? hoje_data : ontem_data;
         const lj = mapa.loja;
         if (!target[lj]) target[lj] = emptyLoja();
 
         if (tipo === 'fat') {
-          // Filtra apenas os itens que pertencem a esta loja (lojaId no registro)
           data
             .filter(item => !item.lojaId || item.lojaId === lojaId)
             .forEach(item => {
@@ -177,8 +184,6 @@ export default function Hoje() {
 
   return (
     <div className="p-4 lg:p-6 space-y-4 max-w-7xl mx-auto pb-20 lg:pb-6">
-
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -217,7 +222,6 @@ export default function Hoje() {
 
       {dados && kd && (
         <>
-          {/* KPI cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-white border border-surface-border rounded-2xl p-4">
               <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
@@ -247,7 +251,6 @@ export default function Hoje() {
             </div>
           </div>
 
-          {/* Tabela por loja */}
           <div className="bg-white border border-surface-border rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
               <h3 className="font-semibold text-brand-black">Por Loja — {d ? 'Hoje' : 'Ontem'}</h3>
