@@ -98,12 +98,12 @@ export default function Hoje() {
         if (lojaNome === 'Quintal do Espeto Pavão' && dia === 'ontem' && tipo === 'fat') {
           console.log(`[PAVÃO DEBUG] ${data.length} registros retornados para loja ${lojaId}`);
           data.forEach((item, i) => {
-            console.log(`  [${i}] lojaId=${item.lojaId} value=${item.value} eventDate=${item.eventDate}`);
+            console.log(`  [${i}] paymentId=${item.paymentId} paymentName="${item.paymentName}" value=${item.value}`);
           });
           const totalBruto = data.reduce((s, i) => s + (i.value || 0) / 100, 0);
           const totalFiltrado = data.filter(i => i.lojaId === lojaId).reduce((s, i) => s + (i.value || 0) / 100, 0);
           console.log(`[PAVÃO DEBUG] Total bruto: R$${totalBruto.toFixed(2)} | Total filtrado (lojaId correto): R$${totalFiltrado.toFixed(2)}`);
-          console.log(`  [${i}] paymentId=${item.paymentId} paymentName=${item.paymentName} value=${item.value}`);
+          
         }
        
 
