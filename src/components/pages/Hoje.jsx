@@ -50,11 +50,8 @@ const LOJA_COLORS = {
 function emptyLoja() {
   return { salao: 0, delivery: 0, pessoas: 0, valorComp: 0 };
 }
-// logo após o results.forEach, antes do setDados
-console.log('PAVÃO hoje_data:', JSON.stringify(hoje_data['PAVÃO'], null, 2));
-console.log('PAVÃO ontem_data:', JSON.stringify(ontem_data['PAVÃO'], null, 2));
+
 export default function Hoje() {
-  
   const [dados,     setDados]     = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [ultimaAtu, setUltimaAtu] = useState(null);
@@ -68,12 +65,13 @@ export default function Hoje() {
       const ontem = new Date(hoje); ontem.setDate(hoje.getDate() - 1);
       const dtHoje  = fmtDate(hoje);
       const dtOntem = fmtDate(ontem);
-      const lojasMapeadas = lojas.filter(l => MAPA_LOJAS[l.name]);
-      console.log('Lojas mapeadas:', JSON.stringify(lojasMapeadas, null, 2));
 
       const lojas = await zigGet(`/erp/lojas?rede=${ZIG_REDE}`);
       if (!lojas) throw new Error('Erro ao buscar lojas');
       const lojasMapeadas = lojas.filter(l => MAPA_LOJAS[l.name]);
+
+      // DEBUG: ver IDs das lojas retornados pela API
+      console.log('[debug] Lojas mapeadas:', JSON.stringify(lojasMapeadas.map(l => ({ id: l.id, name: l.name })), null, 2));
 
       const promises = lojasMapeadas.flatMap(loja => {
         const mapa = MAPA_LOJAS[loja.name];
@@ -96,7 +94,6 @@ export default function Hoje() {
 
       results.forEach(r => {
         if (r.status !== 'fulfilled') return;
-        // CORREÇÃO: adicionado `loja` na desestruturação para ficar disponível no console.log
         const { tipo, dia, loja, mapa, data } = r.value;
         if (!data?.length) return;
         const target = dia === 'hoje' ? hoje_data : ontem_data;
@@ -115,7 +112,6 @@ export default function Hoje() {
         }
 
         if (tipo === 'comp') {
-          // 1 registro = 1 comprador (melhor aproximação disponível na API)
           data.forEach(item => {
             const v = (item.productsValue || 0) / 100;
             if (v <= 0) return;
@@ -124,6 +120,10 @@ export default function Hoje() {
           });
         }
       });
+
+      // DEBUG: ver o que acumulou para PAVÃO especificamente
+      console.log('[debug] PAVÃO hoje_data:', JSON.stringify(hoje_data['PAVÃO'], null, 2));
+      console.log('[debug] PAVÃO ontem_data:', JSON.stringify(ontem_data['PAVÃO'], null, 2));
 
       const todasLojas = [...new Set([...Object.keys(hoje_data), ...Object.keys(ontem_data)])].sort();
 
