@@ -81,7 +81,6 @@ export default function Hoje() {
             .then(d => ({ tipo:'comp', dia:'hoje', loja, mapa, data:d })),
           zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
             .then(d => ({ tipo:'comp', dia:'ontem', loja, mapa, data:d })),
-
         ];
       });
 
@@ -92,7 +91,8 @@ export default function Hoje() {
 
       results.forEach(r => {
         if (r.status !== 'fulfilled') return;
-        const { tipo, dia, mapa, data } = r.value;
+        // CORREÇÃO: adicionado `loja` na desestruturação para ficar disponível no console.log
+        const { tipo, dia, loja, mapa, data } = r.value;
         if (!data?.length) return;
         const target = dia === 'hoje' ? hoje_data : ontem_data;
         const lj = mapa.loja;
