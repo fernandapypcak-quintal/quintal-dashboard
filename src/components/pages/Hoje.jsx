@@ -103,7 +103,9 @@ export default function Hoje() {
           const totalBruto = data.reduce((s, i) => s + (i.value || 0) / 100, 0);
           const totalFiltrado = data.filter(i => i.lojaId === lojaId).reduce((s, i) => s + (i.value || 0) / 100, 0);
           console.log(`[PAVÃO DEBUG] Total bruto: R$${totalBruto.toFixed(2)} | Total filtrado (lojaId correto): R$${totalFiltrado.toFixed(2)}`);
+          console.log(`  [${i}] paymentId=${item.paymentId} paymentName=${item.paymentName} value=${item.value}`);
         }
+       
 
         const target = dia === 'hoje' ? hoje_data : ontem_data;
         const lj = mapa.loja;
