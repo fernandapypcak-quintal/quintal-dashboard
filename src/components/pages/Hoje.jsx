@@ -69,7 +69,7 @@ export default function Hoje() {
       const dtHoje  = fmtDate(hoje);
       const dtOntem = fmtDate(ontem);
       const lojasMapeadas = lojas.filter(l => MAPA_LOJAS[l.name]);
-console.log('Lojas mapeadas:', JSON.stringify(lojasMapeadas, null, 2));
+      console.log('Lojas mapeadas:', JSON.stringify(lojasMapeadas, null, 2));
 
       const lojas = await zigGet(`/erp/lojas?rede=${ZIG_REDE}`);
       if (!lojas) throw new Error('Erro ao buscar lojas');
