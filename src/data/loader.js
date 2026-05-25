@@ -4,6 +4,10 @@ const URL = 'https://script.google.com/macros/s/AKfycbyEoeYAWVUGc8n-_J61Sd91XDhk
 
 const MESES = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
+// Data de corte FIXA: planilha tem histórico até 17/05/2026,
+// ZIG (zig_faturamento) começa em 18/05/2026.
+const DATA_CORTE_ZIG = '2026-05-18';
+
 function toDate(v) {
   if (!v) return '';
   const s = String(v).trim();
@@ -56,23 +60,24 @@ function isValid(r) {
     r.Dia >= 1   && r.Dia <= 31 && r.Valor > 0;
 }
 
-// Data de corte: a partir de quando a ZIG passa a ser a fonte verdade
-// Tudo antes disso vem da planilha, tudo a partir disso vem da ZIG
-function getDataCorte() {
-  // Usa ontem como corte — planilha tem histórico até ontem, ZIG completa a partir daí
-  const hoje = new Date();
-  hoje.setDate(hoje.getDate() - 1);
-  return `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
+function getDataOntem() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function getDataHoje() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 // modoAoVivo = true  → inclui dados de hoje (ZIG em tempo real)
 // modoAoVivo = false → só até ontem D-1 (padrão, dados fechados)
 export async function loadData(modoAoVivo = false) {
-  const hoje = new Date();
-  const dataHoje = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`;
-  const dataCorte = getDataCorte(); // ontem
+  const dataHoje  = getDataHoje();
+  const dataOntem = getDataOntem();
 
-  console.log(`[loader] Modo: ${modoAoVivo ? '🔴 AO VIVO' : '📋 FECHADO (D-1)'} | Corte: ${dataCorte}`);
+  console.log(`[loader] Modo: ${modoAoVivo ? '🔴 AO VIVO' : '📋 FECHADO (D-1)'} | Corte: ${dataOntem}`);
 
   // Busca planilha e ZIG em paralelo
   const [resPlanilha, resZig] = await Promise.allSettled([
@@ -80,26 +85,30 @@ export async function loadData(modoAoVivo = false) {
     fetch(`${URL}?tipo=zig`).then(r => r.json()),
   ]);
 
-  // Dados da planilha (histórico até o corte)
+  // Dados da planilha: histórico até 17/05/2026 (antes do corte fixo da ZIG)
   let dadosPlanilha = [];
   if (resPlanilha.status === 'fulfilled' && resPlanilha.value?.dados?.length) {
     dadosPlanilha = resPlanilha.value.dados
       .map(parseRowPlanilha)
       .filter(isValid)
-      .filter(r => r.Data < dataCorte);
+      .filter(r => r.Data < DATA_CORTE_ZIG); // tudo antes de 18/05/2026
     console.log(`[loader] Planilha: ${dadosPlanilha.length} registros`);
   }
 
-  // Dados da ZIG
+  // Dados da ZIG: a partir de 18/05/2026
   let dadosZig = [];
   if (resZig.status === 'fulfilled' && resZig.value?.zig?.length) {
-    const zigParsed = resZig.value.zig.map(parseRowZig).filter(isValid);
+    const zigParsed = resZig.value.zig
+      .map(parseRowZig)
+      .filter(isValid)
+      .filter(r => r.Data >= DATA_CORTE_ZIG); // só a partir de 18/05/2026
+
     if (modoAoVivo) {
-      // Ao vivo: pega tudo da ZIG a partir do corte (inclui hoje)
-      dadosZig = zigParsed.filter(r => r.Data >= dataCorte);
+      // Ao vivo: inclui hoje
+      dadosZig = zigParsed;
     } else {
-      // Fechado: só até ontem (exclui hoje)
-      dadosZig = zigParsed.filter(r => r.Data >= dataCorte && r.Data < dataHoje);
+      // Fechado D-1: exclui hoje
+      dadosZig = zigParsed.filter(r => r.Data < dataHoje);
     }
     console.log(`[loader] ZIG: ${dadosZig.length} registros (${modoAoVivo ? 'ao vivo' : 'fechado'})`);
   }
