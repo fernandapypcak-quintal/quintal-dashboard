@@ -20,13 +20,6 @@ const BRLk = v => v >= 1e6 ? 'R$\u00a0'+(v/1e6).toFixed(1).replace('.',',')+'M'
 
 const DOW_LABELS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 
-
-// ── Tend Fat: realizado + projeção dias restantes por dia da semana ──────
-// Lógica idêntica à planilha de acompanhamento:
-// - Médias calculadas com TODOS os dias com dados (1 até lastDay inclusive)
-// - Projeção para os dias lastDay+1 até fim do mês
-// - Dia_Semana_Num no CSV: 0=Dom, 1=Seg...6=Sáb (igual JS getDay())
-
 export default function Stores() {
   const { rawData } = useFilters();
   const { getMeta } = useMetas();
@@ -59,24 +52,20 @@ export default function Stores() {
     return lojas.map((loja, idx) => {
       const color = STORE_COLORS[idx % STORE_COLORS.length];
 
-      // Mês atual
       const recsCur   = rawData.filter(r => r.Ano_Mes === latestKey && r.Loja === loja);
       const realAtual = sum(recsCur);
       const casa      = sum(recsCur.filter(r => r.Canal === 'CASA'));
       const delivery  = sum(recsCur.filter(r => r.Canal === 'DELIVERY'));
 
-      // Mesmo período ano anterior (com corte no mesmo dia)
       const recsAA = rawData.filter(r =>
         r.Ano === ano - 1 && r.Mes === mes && r.Loja === loja && r.Dia <= lastDay
       );
       const realAA = sum(recsAA);
       const yoy    = variation(realAtual, realAA);
 
-      // Meta e atingimento
       const meta  = getMeta(latestKey, loja);
       const ating = meta > 0 ? realAtual / meta * 100 : null;
 
-      // Aceleração — compara média diária da 2ª metade vs 1ª metade do mês
       const meioMes   = Math.floor(lastDay / 2);
       const recs1a    = recsCur.filter(r => r.Dia <= meioMes);
       const recs2a    = recsCur.filter(r => r.Dia > meioMes);
@@ -86,7 +75,6 @@ export default function Stores() {
       const media2a   = dias2a > 0 ? sum(recs2a) / dias2a : 0;
       const aceleracao = media1a > 0 ? ((media2a - media1a) / media1a) * 100 : null;
 
-      // Almoço desta loja
       const recsAlmoco    = getAlmocoLoja(ano, mes, loja);
       const totalAlmoco   = recsAlmoco.reduce((s,r) => s+r.Valor, 0);
       const pesoAlmoco    = casa > 0 ? totalAlmoco/casa*100 : 0;
@@ -97,19 +85,15 @@ export default function Stores() {
         allAlmocoLoja.reduce((acc,r) => { acc[r.Ano_Mes]=(acc[r.Ano_Mes]||0)+r.Valor; return acc; }, {})
       ).sort(([a],[b]) => a.localeCompare(b));
 
-      // Tend Fat
-      // Tend Fat = realizado + projeção dos dias restantes por dia da semana
       const tendFat = calcTendFat(recsCur, lastDay, totalDays, ano, mes);
       const prevAAfull  = sum(rawData.filter(r =>
         r.Ano === ano - 1 && r.Mes === mes && r.Loja === loja
       ));
       const tendVsAA = variation(tendFat, prevAAfull);
 
-      // Share
-      const share    = grandTotal > 0 ? realAtual / grandTotal * 100 : 0;
+      const share     = grandTotal > 0 ? realAtual / grandTotal * 100 : 0;
       const tendAting = meta > 0 ? tendFat / meta * 100 : null;
 
-      // Melhor dia da semana
       const dowStats = DOW_LABELS.map((label, dowIdx) => {
         const recs = recsCur.filter(r => r.Dia_Semana_Num === dowIdx);
         const dias = [...new Set(recs.map(r => r.Data))].length;
@@ -117,7 +101,6 @@ export default function Stores() {
       }).filter(d => d.media > 0);
       const melhorDia = [...dowStats].sort((a, b) => b.media - a.media)[0];
 
-      // Evolução mensal — só o ano atual (sem misturar anos)
       const monthly = monthlyTotals(
         rawData.filter(r => r.Loja === loja && r.Ano === ano)
       ).map(m => {
@@ -134,10 +117,8 @@ export default function Stores() {
         share, yoy, melhorDia, monthly, tendAting,
         totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
         aceleracao, media1a, media2a,
-        totalAlmoco, pesoAlmoco, jantarCasa, inicioAlmoco, almocoMensal,
       };
     }).sort((a, b) => {
-      // Ordena por % atingimento (desc), quem não tem meta vai pro fim
       if (a.ating === null && b.ating === null) return b.realAtual - a.realAtual;
       if (a.ating === null) return 1;
       if (b.ating === null) return -1;
@@ -147,14 +128,16 @@ export default function Stores() {
 
   if (!periodo) return null;
 
-  const grandMeta  = lojaStats.reduce((s, l) => s + l.meta, 0);
-  const grandReal     = lojaStats.reduce((s, l) => s + l.realAtual, 0);
-  const grandAting    = grandMeta > 0 ? grandReal / grandMeta * 100 : null;
-  const grandTend     = lojaStats.reduce((s, l) => s + l.tendFat, 0);
-  const grandRealAA   = lojaStats.reduce((s, l) => s + (l.realAA   || 0), 0);
-  const grandTendAA   = lojaStats.reduce((s, l) => s + (l.prevAAfull || 0), 0);
-  const grandYoY      = grandRealAA > 0 ? variation(grandReal, grandRealAA) : null;
-  const grandTendVsAA = grandTendAA  > 0 ? variation(grandTend, grandTendAA) : null;
+  const grandMeta      = lojaStats.reduce((s, l) => s + l.meta, 0);
+  const grandReal      = lojaStats.reduce((s, l) => s + l.realAtual, 0);
+  const grandAting     = grandMeta > 0 ? grandReal / grandMeta * 100 : null;
+  const grandTend      = lojaStats.reduce((s, l) => s + l.tendFat, 0);
+  const grandRealAA    = lojaStats.reduce((s, l) => s + (l.realAA || 0), 0);
+  const grandTendAA    = lojaStats.reduce((s, l) => s + (l.prevAAfull || 0), 0);
+  const grandYoY       = grandRealAA > 0 ? variation(grandReal, grandRealAA) : null;
+  const grandTendVsAA  = grandTendAA  > 0 ? variation(grandTend, grandTendAA) : null;
+  // Projeção da meta no total: Tend Fat total / Meta total
+  const grandTendAting = grandMeta > 0 ? grandTend / grandMeta * 100 : null;
 
   return (
     <div className="p-6 space-y-4 animate-fade-in">
@@ -179,19 +162,16 @@ export default function Stores() {
               className="bg-white border border-surface-border rounded-2xl"
               style={{ borderLeft: `4px solid ${l.color}` }}
             >
-              {/* Header — sempre visível */}
               <button
                 className="w-full text-left px-5 py-4 flex items-center justify-between hover:bg-surface-muted/30 transition-colors"
                 onClick={() => setExpandedLoja(isExpanded ? null : l.loja)}
               >
                 <div className="flex items-center gap-5 flex-wrap flex-1 min-w-0">
-                  {/* Nome + valor */}
                   <div className="min-w-[130px]">
                     <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-0.5">{l.loja}</p>
                     <p className="text-xl font-bold font-display" style={{ color: l.color }}>{formatBRL(l.realAtual, true)}</p>
                   </div>
 
-                  {/* Métricas inline */}
                   <div className="flex items-center gap-6 flex-wrap text-sm">
 
                     <div>
@@ -244,6 +224,7 @@ export default function Stores() {
                         <p className="text-[10px] text-zinc-400">{formatBRL(l.tendFat, true)} de {formatBRL(l.meta, true)}</p>
                       </div>
                     )}
+
                     <div>
                       <div className="flex items-center gap-0.5 mb-0.5"><p className="text-[10px] text-zinc-400 uppercase tracking-wider">Peso</p><InfoTip text="% que esta loja representa no faturamento total do período." /></div>
                       <p className="font-semibold text-zinc-600">{l.share.toFixed(1)}%</p>
@@ -258,7 +239,6 @@ export default function Stores() {
                   </div>
                 </div>
 
-                {/* Mini barra + chevron */}
                 <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                   {l.ating !== null && (
                     <div className="hidden sm:flex items-center gap-2">
@@ -271,12 +251,10 @@ export default function Stores() {
                 </div>
               </button>
 
-              {/* Detalhe expandido */}
               {isExpanded && (
                 <div className="border-t border-surface-border px-5 py-5">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                    {/* Gráfico evolução mensal */}
                     <div>
                       <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
                         Evolução Mensal
@@ -328,7 +306,6 @@ export default function Stores() {
                       </ResponsiveContainer>
                     </div>
 
-                    {/* Detalhe numérico */}
                     <div>
                       <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">
                         {periodo.label} — Detalhe (até dia {periodo.lastDay})
@@ -359,7 +336,6 @@ export default function Stores() {
                         ))}
                       </div>
 
-                      {/* Almoço evolution */}
                       {l.totalAlmoco > 0 && (
                         <div className="mt-4 pt-3 border-t border-surface-border">
                           <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider mb-2">
@@ -401,7 +377,6 @@ export default function Stores() {
                         </div>
                       )}
 
-                      {/* Barra de atingimento */}
                       {l.ating !== null && (
                         <div className="mt-4">
                           <div className="flex justify-between text-xs mb-1.5">
@@ -540,7 +515,18 @@ export default function Stores() {
                   </span>
                 ) : '—'}
               </td>
-              <td className="py-3 px-3 text-right text-zinc-300 text-xs">—</td>
+              <td className="py-3 px-3 text-right">
+                {grandTendAting !== null ? (
+                  <div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${grandTendAting >= 100 ? 'text-emerald-700 bg-emerald-50' : grandTendAting >= 80 ? 'text-amber-700 bg-amber-50' : 'text-rose-700 bg-rose-50'}`}>
+                      {grandTendAting.toFixed(1).replace('.', ',')}%
+                    </span>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">
+                      {formatBRL(grandTend, true)} de {formatBRL(grandMeta, true)}
+                    </p>
+                  </div>
+                ) : '—'}
+              </td>
               <td className="py-3 pl-3 text-right">
                 <span className="text-xs font-semibold text-zinc-600">100%</span>
               </td>
