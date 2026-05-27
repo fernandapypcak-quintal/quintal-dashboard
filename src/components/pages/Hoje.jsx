@@ -53,8 +53,7 @@ const LOJA_COLORS = {
 };
 
 function emptyLoja() {
-  // pessoas = total de compradores (incluindo ticket zero, igual à Zig)
-  return { salao: 0, delivery: 0, pessoas: 0 };
+  return { salao: 0, delivery: 0 };
 }
 
 export default function Hoje() {
@@ -80,13 +79,9 @@ export default function Hoje() {
         const mapa = MAPA_LOJAS[loja.name];
         return [
           zigGet(`/erp/faturamento?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'fat', dia: 'hoje', lojaId: loja.id, mapa, data: d })),
+            .then(d => ({ dia: 'hoje', lojaId: loja.id, mapa, data: d })),
           zigGet(`/erp/faturamento?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'fat', dia: 'ontem', lojaId: loja.id, mapa, data: d })),
-          zigGet(`/erp/compradores?dtinicio=${dtHoje}&dtfim=${dtHoje}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'comp', dia: 'hoje', lojaId: loja.id, mapa, data: d })),
-          zigGet(`/erp/compradores?dtinicio=${dtOntem}&dtfim=${dtOntem}&loja=${loja.id}`)
-            .then(d => ({ tipo: 'comp', dia: 'ontem', lojaId: loja.id, mapa, data: d })),
+            .then(d => ({ dia: 'ontem', lojaId: loja.id, mapa, data: d })),
         ];
       });
 
@@ -97,34 +92,22 @@ export default function Hoje() {
 
       results.forEach(r => {
         if (r.status !== 'fulfilled') return;
-        const { tipo, dia, lojaId, mapa, data } = r.value;
+        const { dia, lojaId, mapa, data } = r.value;
         if (!data?.length) return;
 
         const target = dia === 'hoje' ? hoje_data : ontem_data;
         const lj = mapa.loja;
         if (!target[lj]) target[lj] = emptyLoja();
 
-        if (tipo === 'fat') {
-          data
-            .filter(item => !item.lojaId || item.lojaId === lojaId)
-            .filter(item => !PAGAMENTOS_EXCLUIDOS.has(item.paymentName))
-            .forEach(item => {
-              const v = (item.value || 0) / 100;
-              if (v <= 0) return;
-              if (mapa.canal === 'CASA')     target[lj].salao    += v;
-              if (mapa.canal === 'DELIVERY') target[lj].delivery += v;
-            });
-        }
-
-        if (tipo === 'comp') {
-          // Conta TODOS os compradores (incluindo ticket zero),
-          // igual à metodologia da Zig: ticket médio = faturamento / total compradores
-          data
-            .filter(item => !item.lojaId || item.lojaId === lojaId)
-            .forEach(() => {
-              target[lj].pessoas += 1;
-            });
-        }
+        data
+          .filter(item => !item.lojaId || item.lojaId === lojaId)
+          .filter(item => !PAGAMENTOS_EXCLUIDOS.has(item.paymentName))
+          .forEach(item => {
+            const v = (item.value || 0) / 100;
+            if (v <= 0) return;
+            if (mapa.canal === 'CASA')     target[lj].salao    += v;
+            if (mapa.canal === 'DELIVERY') target[lj].delivery += v;
+          });
       });
 
       const todasLojas = [...new Set([...Object.keys(hoje_data), ...Object.keys(ontem_data)])].sort();
@@ -134,33 +117,25 @@ export default function Hoje() {
         const o = ontem_data[lj] || emptyLoja();
         const totalH = h.salao + h.delivery;
         const totalO = o.salao + o.delivery;
-        // Ticket médio = faturamento total / total de compradores (metodologia Zig)
-        const ticketH = h.pessoas > 0 ? totalH / h.pessoas : 0;
-        const ticketO = o.pessoas > 0 ? totalO / o.pessoas : 0;
         return {
           loja: lj,
-          hoje:  { total: totalH, salao: h.salao, delivery: h.delivery, ticket: ticketH, pessoas: h.pessoas },
-          ontem: { total: totalO, salao: o.salao, delivery: o.delivery, ticket: ticketO, pessoas: o.pessoas },
+          hoje:  { total: totalH, salao: h.salao, delivery: h.delivery },
+          ontem: { total: totalO, salao: o.salao, delivery: o.delivery },
           varOntem: totalO > 0 ? (totalH - totalO) / totalO * 100 : null,
           color: LOJA_COLORS[lj] || '#999',
         };
       });
 
-      const totalH   = porLoja.reduce((s,l) => s + l.hoje.total,    0);
-      const totalO   = porLoja.reduce((s,l) => s + l.ontem.total,   0);
-      const salaoH   = porLoja.reduce((s,l) => s + l.hoje.salao,    0);
-      const delH     = porLoja.reduce((s,l) => s + l.hoje.delivery, 0);
-      const salaoO   = porLoja.reduce((s,l) => s + l.ontem.salao,   0);
-      const delO     = porLoja.reduce((s,l) => s + l.ontem.delivery,0);
-      const pessoasH = porLoja.reduce((s,l) => s + l.hoje.pessoas,  0);
-      const pessoasO = porLoja.reduce((s,l) => s + l.ontem.pessoas, 0);
-      // Ticket total = faturamento total / total pessoas
-      const ticketH  = pessoasH > 0 ? totalH / pessoasH : 0;
-      const ticketO  = pessoasO > 0 ? totalO / pessoasO : 0;
+      const totalH = porLoja.reduce((s,l) => s + l.hoje.total,    0);
+      const totalO = porLoja.reduce((s,l) => s + l.ontem.total,   0);
+      const salaoH = porLoja.reduce((s,l) => s + l.hoje.salao,    0);
+      const delH   = porLoja.reduce((s,l) => s + l.hoje.delivery, 0);
+      const salaoO = porLoja.reduce((s,l) => s + l.ontem.salao,   0);
+      const delO   = porLoja.reduce((s,l) => s + l.ontem.delivery,0);
 
       setDados({ porLoja, dtHoje, dtOntem,
-        hoje:  { total: totalH, salao: salaoH, delivery: delH, ticket: ticketH, pessoas: pessoasH },
-        ontem: { total: totalO, salao: salaoO, delivery: delO, ticket: ticketO, pessoas: pessoasO },
+        hoje:  { total: totalH, salao: salaoH, delivery: delH },
+        ontem: { total: totalO, salao: salaoO, delivery: delO },
         varTotal: totalO > 0 ? (totalH - totalO) / totalO * 100 : null,
       });
       setUltimaAtu(fmtHora());
@@ -218,7 +193,8 @@ export default function Hoje() {
 
       {dados && kd && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* KPI cards — apenas faturamento, salão e delivery */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-white border border-surface-border rounded-2xl p-4">
               <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
                 Faturamento {d ? 'Hoje' : 'Ontem'}
@@ -240,13 +216,9 @@ export default function Hoje() {
               <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(kd.delivery, true)}</p>
               <p className="text-xs text-zinc-400 mt-1">{kd.total > 0 ? (kd.delivery/kd.total*100).toFixed(1).replace('.',',') : '0'}% do total</p>
             </div>
-            <div className="bg-white border border-surface-border rounded-2xl p-4">
-              <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Ticket Médio</p>
-              <p className="text-2xl font-bold font-display text-brand-black">{kd.ticket > 0 ? formatBRL(kd.ticket) : '—'}</p>
-              {kd.pessoas > 0 && <p className="text-xs text-zinc-400 mt-1">{kd.pessoas.toLocaleString('pt-BR')} pessoas</p>}
-            </div>
           </div>
 
+          {/* Tabela por loja */}
           <div className="bg-white border border-surface-border rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
               <h3 className="font-semibold text-brand-black">Por Loja — {d ? 'Hoje' : 'Ontem'}</h3>
@@ -261,8 +233,6 @@ export default function Hoje() {
                     <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Salão</th>
                     <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Delivery</th>
                     {d && <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Vs Ontem</th>}
-                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Médio</th>
-                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Pessoas</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -304,12 +274,6 @@ export default function Hoje() {
                               ) : '—'}
                             </td>
                           )}
-                          <td className="py-3 px-4 text-right font-mono text-zinc-600">
-                            {v.ticket > 0 ? formatBRL(v.ticket) : '—'}
-                          </td>
-                          <td className="py-3 px-4 text-right text-zinc-500">
-                            {v.pessoas > 0 ? v.pessoas : '—'}
-                          </td>
                         </tr>
                       );
                   })}
@@ -330,12 +294,6 @@ export default function Hoje() {
                         )}
                       </td>
                     )}
-                    <td className="py-3 px-4 text-right font-mono text-zinc-600">
-                      {kd.ticket > 0 ? formatBRL(kd.ticket) : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-right text-zinc-500">
-                      {kd.pessoas > 0 ? kd.pessoas : '—'}
-                    </td>
                   </tr>
                 </tfoot>
               </table>
