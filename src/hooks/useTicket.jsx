@@ -21,28 +21,26 @@ export function TicketProvider({ children }) {
     });
   }, []);
 
-  // Ticket médio — respeita filtro de lojas (Set), canal e período
+  // Retorna total de pessoas (compradores) do período.
+  // O ticket médio é calculado pelo componente cruzando com o faturamento real do rawData.
+  // Metodologia Zig: ticket = faturamento total / total de compradores (incluindo ticket zero)
   function getTicket(ano, mes, canal = null, lojasFilter = null) {
     let recs = compradores.filter(r => r.Ano === ano && r.Mes === mes);
     if (canal) recs = recs.filter(r => r.Canal === canal);
     if (lojasFilter && lojasFilter.size > 0) {
-      // Debug: log available lojas vs filter
-      const lojasDisponiveis = [...new Set(recs.map(r => r.Loja))];
-      console.log('[ticket] lojas disponíveis:', lojasDisponiveis, '| filtro:', [...lojasFilter]);
       recs = recs.filter(r => lojasFilter.has(r.Loja));
     }
-    const totalPessoas = recs.reduce((s,r) => s + r.Pessoas, 0);
-    const totalValor   = recs.reduce((s,r) => s + r.Valor,   0);
-    return { ticket: totalPessoas > 0 ? totalValor/totalPessoas : 0, pessoas: totalPessoas, valor: totalValor };
+    // Soma apenas o número de compradores — o faturamento real vem do rawData
+    const totalPessoas = recs.reduce((s,r) => s + (r.Pessoas || 0), 0);
+    return { pessoas: totalPessoas };
   }
 
   // Ticket por loja específica
   function getTicketLoja(ano, mes, loja, canal = null) {
     let recs = compradores.filter(r => r.Ano === ano && r.Mes === mes && r.Loja === loja);
     if (canal) recs = recs.filter(r => r.Canal === canal);
-    const totalPessoas = recs.reduce((s,r) => s + r.Pessoas, 0);
-    const totalValor   = recs.reduce((s,r) => s + r.Valor,   0);
-    return { ticket: totalPessoas > 0 ? totalValor/totalPessoas : 0, pessoas: totalPessoas };
+    const totalPessoas = recs.reduce((s,r) => s + (r.Pessoas || 0), 0);
+    return { pessoas: totalPessoas };
   }
 
   // Desconto — respeita filtro de lojas

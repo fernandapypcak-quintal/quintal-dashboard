@@ -301,35 +301,48 @@ export default function Overview() {
       {/* ── TICKET MÉDIO + DESCONTO ── */}
       {periodo && (() => {
         const lojasF = filters.lojas;
-        const tk     = getTicket(periodo.ano, periodo.mes, null,       lojasF);
-        const tkSal  = getTicket(periodo.ano, periodo.mes, 'CASA',     lojasF);
-        const tkDel  = getTicket(periodo.ano, periodo.mes, 'DELIVERY', lojasF);
-        const dsc    = getDesconto(periodo.ano, periodo.mes, lojasF);
+        // Busca apenas o número de compradores do hook
+        const tk    = getTicket(periodo.ano, periodo.mes, null,       lojasF);
+        const tkSal = getTicket(periodo.ano, periodo.mes, 'CASA',     lojasF);
+        const tkDel = getTicket(periodo.ano, periodo.mes, 'DELIVERY', lojasF);
+        const dsc   = getDesconto(periodo.ano, periodo.mes, lojasF);
         if (tk.pessoas === 0) return null;
+
+        // Faturamento real do período (já filtrado por loja/canal via baseData)
+        const recsMesAtual = baseData.filter(r => r.Ano === periodo.ano && r.Mes === periodo.mes);
+        const fatTotal  = sum(recsMesAtual);
+        const fatSalao  = sum(recsMesAtual.filter(r => r.Canal === 'CASA'));
+        const fatDel    = sum(recsMesAtual.filter(r => r.Canal === 'DELIVERY'));
+
+        // Ticket médio = faturamento / compradores (metodologia Zig)
+        const ticketTotal = tk.pessoas    > 0 ? fatTotal / tk.pessoas    : 0;
+        const ticketSal   = tkSal.pessoas > 0 ? fatSalao / tkSal.pessoas : 0;
+        const ticketDel   = tkDel.pessoas > 0 ? fatDel   / tkDel.pessoas : 0;
+
         return (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border border-surface-border rounded-2xl p-5">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Médio</p>
-                <InfoTip text="Faturamento total dividido pelo número de compradores no período." />
+                <InfoTip text="Faturamento total dividido pelo número de compradores no período (metodologia Zig)." />
               </div>
-              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tk.ticket)}</p>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(ticketTotal)}</p>
               <p className="text-xs text-zinc-400 mt-1">{tk.pessoas.toLocaleString('pt-BR')} pessoas</p>
             </div>
             <div className="bg-white border border-surface-border rounded-2xl p-5">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Salão</p>
-                <InfoTip text="Ticket médio por pessoa no canal Salão." />
+                <InfoTip text="Faturamento salão dividido pelo número de compradores no canal Casa." />
               </div>
-              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tkSal.ticket)}</p>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(ticketSal)}</p>
               <p className="text-xs text-zinc-400 mt-1">{tkSal.pessoas.toLocaleString('pt-BR')} pessoas</p>
             </div>
             <div className="bg-white border border-surface-border rounded-2xl p-5">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Delivery</p>
-                <InfoTip text="Ticket médio por pedido no canal Delivery." />
+                <InfoTip text="Faturamento delivery dividido pelo número de pedidos no canal Delivery." />
               </div>
-              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tkDel.ticket)}</p>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(ticketDel)}</p>
               <p className="text-xs text-zinc-400 mt-1">{tkDel.pessoas.toLocaleString('pt-BR')} pedidos</p>
             </div>
             <div className="bg-white border border-surface-border rounded-2xl p-5">

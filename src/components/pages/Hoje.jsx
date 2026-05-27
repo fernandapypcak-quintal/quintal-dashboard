@@ -30,8 +30,6 @@ const MAPA_LOJAS = {
   'Delivery Santana':                   { loja: 'SANTANA',       canal: 'DELIVERY' },
 };
 
-// Métodos de pagamento que NÃO entram no faturamento de receita
-// (bônus e notas manuais/serviço são excluídos, conforme tela financeiro da Zig)
 const PAGAMENTOS_EXCLUIDOS = new Set([
   'BÔNUS',
   'NOTAS MANUAIS + SERVIÇO',
@@ -55,7 +53,8 @@ const LOJA_COLORS = {
 };
 
 function emptyLoja() {
-  return { salao: 0, delivery: 0, pessoas: 0, valorComp: 0 };
+  // pessoas = total de compradores (incluindo ticket zero, igual à Zig)
+  return { salao: 0, delivery: 0, pessoas: 0 };
 }
 
 export default function Hoje() {
@@ -118,13 +117,12 @@ export default function Hoje() {
         }
 
         if (tipo === 'comp') {
+          // Conta TODOS os compradores (incluindo ticket zero),
+          // igual à metodologia da Zig: ticket médio = faturamento / total compradores
           data
             .filter(item => !item.lojaId || item.lojaId === lojaId)
-            .forEach(item => {
-              const v = (item.productsValue || 0) / 100;
-              if (v <= 0) return;
-              target[lj].pessoas   += 1;
-              target[lj].valorComp += v;
+            .forEach(() => {
+              target[lj].pessoas += 1;
             });
         }
       });
@@ -136,12 +134,13 @@ export default function Hoje() {
         const o = ontem_data[lj] || emptyLoja();
         const totalH = h.salao + h.delivery;
         const totalO = o.salao + o.delivery;
+        // Ticket médio = faturamento total / total de compradores (metodologia Zig)
+        const ticketH = h.pessoas > 0 ? totalH / h.pessoas : 0;
+        const ticketO = o.pessoas > 0 ? totalO / o.pessoas : 0;
         return {
           loja: lj,
-          hoje:  { total: totalH, salao: h.salao, delivery: h.delivery,
-                   ticket: h.pessoas > 0 ? h.valorComp/h.pessoas : 0, pessoas: h.pessoas },
-          ontem: { total: totalO, salao: o.salao, delivery: o.delivery,
-                   ticket: o.pessoas > 0 ? o.valorComp/o.pessoas : 0, pessoas: o.pessoas },
+          hoje:  { total: totalH, salao: h.salao, delivery: h.delivery, ticket: ticketH, pessoas: h.pessoas },
+          ontem: { total: totalO, salao: o.salao, delivery: o.delivery, ticket: ticketO, pessoas: o.pessoas },
           varOntem: totalO > 0 ? (totalH - totalO) / totalO * 100 : null,
           color: LOJA_COLORS[lj] || '#999',
         };
@@ -154,11 +153,10 @@ export default function Hoje() {
       const salaoO   = porLoja.reduce((s,l) => s + l.ontem.salao,   0);
       const delO     = porLoja.reduce((s,l) => s + l.ontem.delivery,0);
       const pessoasH = porLoja.reduce((s,l) => s + l.hoje.pessoas,  0);
-      const valorCH  = porLoja.reduce((s,l) => s + l.hoje.pessoas * l.hoje.ticket, 0);
-      const ticketH  = pessoasH > 0 ? valorCH / pessoasH : 0;
       const pessoasO = porLoja.reduce((s,l) => s + l.ontem.pessoas, 0);
-      const valorCO  = porLoja.reduce((s,l) => s + l.ontem.pessoas * l.ontem.ticket, 0);
-      const ticketO  = pessoasO > 0 ? valorCO / pessoasO : 0;
+      // Ticket total = faturamento total / total pessoas
+      const ticketH  = pessoasH > 0 ? totalH / pessoasH : 0;
+      const ticketO  = pessoasO > 0 ? totalO / pessoasO : 0;
 
       setDados({ porLoja, dtHoje, dtOntem,
         hoje:  { total: totalH, salao: salaoH, delivery: delH, ticket: ticketH, pessoas: pessoasH },
