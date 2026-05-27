@@ -596,35 +596,84 @@ export default function Overview() {
         </ResponsiveContainer>
       </div>
 
-      {/* DOW + Mix */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="chart-card lg:col-span-2">
-          <h3 className="section-title mb-1">Por Dia da Semana</h3>
-          <p className="text-xs text-zinc-400 mb-5">Volume acumulado — {periodo.label}</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={dowData} margin={{top:12,right:4,left:0,bottom:0}} barGap={2}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0EC" vertical={false}/>
-              <XAxis dataKey="label" tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false}/>
-              <YAxis tickFormatter={v=>formatBRL(v,true)} tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false} width={76}/>
-              <Tooltip content={<CustomTooltip/>}/>
-              <Bar dataKey="casa"     name="Salão"     fill="#97A624" radius={[4,4,0,0]} maxBarSize={32} />
-              <Bar dataKey="delivery" name="Delivery" fill="#D9B504" radius={[4,4,0,0]} maxBarSize={32}>
-                <LabelList dataKey="delivery" content={(p) => {
-                  if (!showLabels) return null;
-                  const d = dowData[p.index];
-                  if (!d) return null;
-                  const total = (d.casa||0)+(d.delivery||0);
-                  return <text x={p.x+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize={9} fontWeight={500} fill="#52525B" fontFamily="DM Sans">{total>=1e6?`R$\xa0${(total/1e6).toFixed(1).replace('.',',')}M`:total>=1e3?`R$\xa0${(total/1e3).toFixed(0)}k`:`R$\xa0${total.toFixed(0)}`}</text>;
-                }}/>
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+      {/* DOW — Tabela média e volume 2025 vs 2026 */}
+      {periodo && (() => {
+        const { ano, mes, lastDay } = periodo;
+        const DOW_LABELS = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+        const rows = Array.from({length:7}, (_,dow) => {
+          const r26 = baseData.filter(r => r.Ano === ano   && r.Mes === mes && r.Dia_Semana_Num === dow);
+          const r25 = baseData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia_Semana_Num === dow);
+          const dias26 = new Set(r26.map(r => r.Dia)).size;
+          const dias25 = new Set(r25.map(r => r.Dia)).size;
+          const vol26  = sum(r26);
+          const vol25  = sum(r25);
+          const med26  = dias26 > 0 ? vol26/dias26 : 0;
+          const med25  = dias25 > 0 ? vol25/dias25 : 0;
+          const varMed = variation(med26, med25);
+          return { dow, label: DOW_LABELS[dow], dias26, dias25, vol26, vol25, med26, med25, varMed };
+        }).filter(r => r.vol26 > 0 || r.vol25 > 0);
+
+        return (
+          <div className="bg-white border border-surface-border rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <h3 className="section-title">Média por Dia da Semana</h3>
+                <InfoTip text="Média diária de faturamento por dia da semana no mês selecionado. Compara 2026 com o mesmo mês de 2025." />
+              </div>
+              <span className="text-xs text-zinc-400">{periodo.label} vs {periodo.label.split('/')[0]}/{String(periodo.ano-1).slice(2)}</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-surface-border bg-surface-muted/30">
+                    <th className="text-left py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Dia</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Média {ano-1}</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Média {ano}</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Variação</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Dias {ano-1}</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Dias {ano}</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Volume {ano-1}</th>
+                    <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Volume {ano}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(r => (
+                    <tr key={r.dow} className="border-b border-surface-border/50 hover:bg-surface-muted/20 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-brand-black">{r.label}</td>
+                      <td className="py-3 px-4 text-right font-mono text-zinc-400">{r.med25 > 0 ? formatBRL(r.med25, true) : '—'}</td>
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-brand-black">{r.med26 > 0 ? formatBRL(r.med26, true) : '—'}</td>
+                      <td className="py-3 px-4 text-right">
+                        {r.varMed !== null ? (
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
+                            ${r.varMed >= 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'}`}>
+                            {r.varMed >= 0 ? '▲' : '▼'} {Math.abs(r.varMed).toFixed(1).replace('.',',')}%
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="py-3 px-4 text-right text-zinc-400 text-xs">{r.dias25 > 0 ? r.dias25 : '—'}</td>
+                      <td className="py-3 px-4 text-right text-zinc-500 text-xs font-semibold">{r.dias26 > 0 ? r.dias26 : '—'}</td>
+                      <td className="py-3 px-4 text-right font-mono text-zinc-400">{r.vol25 > 0 ? formatBRL(r.vol25, true) : '—'}</td>
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-brand-black">{r.vol26 > 0 ? formatBRL(r.vol26, true) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Mix de Canal */}
+      <div className="chart-card">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <div>
+            <h3 className="section-title mb-1">Mix de Canal</h3>
+            <p className="text-xs text-zinc-400">Participação % — {periodo.label}</p>
+          </div>
         </div>
-        <div className="chart-card flex flex-col">
-          <h3 className="section-title mb-1">Mix de Canal</h3>
-          <p className="text-xs text-zinc-400 mb-3">Participação % — {periodo.label}</p>
-          <div className="flex-1 flex items-center justify-center">
-            <ResponsiveContainer width="100%" height={170}>
+        <div className="flex items-center gap-8 justify-center">
+          <div style={{width:200, height:170}}>
+            <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={48} outerRadius={76}
                   paddingAngle={3} dataKey="value" labelLine={false} label={PieLabel}>
@@ -634,15 +683,15 @@ export default function Overview() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="space-y-2 mt-2">
+          <div className="space-y-3">
             {pieData.map((d,i)=>(
-              <div key={d.name} className="flex items-center justify-between">
+              <div key={d.name} className="flex items-center justify-between gap-8">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-sm" style={{background:PIE_COLORS[i]}}/>
-                  <span className="text-xs text-zinc-600">{d.name}</span>
+                  <span className="text-sm text-zinc-600">{d.name}</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs font-semibold text-brand-black">{formatBRL(d.value,true)}</span>
+                  <span className="text-sm font-semibold text-brand-black">{formatBRL(d.value,true)}</span>
                   <span className="text-xs text-zinc-400 ml-1.5">
                     {kpis.total>0 ? formatPctPlain(d.value/kpis.total*100) : '0%'}
                   </span>
@@ -652,6 +701,5 @@ export default function Overview() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
