@@ -21,25 +21,45 @@ const BRLk = v => v >= 1e6 ? 'R$\u00a0'+(v/1e6).toFixed(1).replace('.',',')+'M'
 const DOW_LABELS = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
 
 export default function Stores() {
-  const { rawData } = useFilters();
+  const { rawData, filters } = useFilters();
   const { getMeta } = useMetas();
   const { almoco, getAlmocoLoja } = useAlmoco();
   const { showLabels } = useLabels();
   const [expandedLoja, setExpandedLoja] = useState(null);
 
   // ── Período atual ──────────────────────────────────────────────
+  // Respeita o filtro de mês selecionado pelo usuário.
+  // Se um mês específico foi selecionado, usa ele; senão usa o mais recente.
   const periodo = useMemo(() => {
     if (!rawData.length) return null;
     const allMonths = [...new Set(rawData.map(r => r.Ano_Mes))].sort();
-    const latestKey = allMonths[allMonths.length - 1];
+
+    let latestKey;
+    if (filters.meses.size === 1 && filters.ano !== 'Todos') {
+      // Mês e ano específicos selecionados — usa exatamente esse
+      const mes = [...filters.meses][0];
+      const ano = Number(filters.ano);
+      latestKey = `${ano}-${String(mes).padStart(2,'0')}`;
+      if (!allMonths.includes(latestKey)) latestKey = allMonths[allMonths.length - 1];
+    } else if (filters.meses.size === 1) {
+      // Só mês selecionado — pega o mais recente desse mês
+      const mes = [...filters.meses][0];
+      const candidatos = allMonths.filter(k => Number(k.split('-')[1]) === mes);
+      latestKey = candidatos.length ? candidatos[candidatos.length - 1] : allMonths[allMonths.length - 1];
+    } else {
+      // Nenhum ou múltiplos meses — usa o mais recente
+      latestKey = allMonths[allMonths.length - 1];
+    }
+
     const [anoStr, mesStr] = latestKey.split('-');
     const ano = Number(anoStr), mes = Number(mesStr);
     const recsLatest = rawData.filter(r => r.Ano_Mes === latestKey);
+    if (!recsLatest.length) return null;
     const lastDay = Math.max(...recsLatest.map(r => r.Dia));
     const label = recsLatest[0]?.Ano_Mes_Label || latestKey;
     const totalDays = daysInMonth(ano, mes);
     return { latestKey, ano, mes, lastDay, label, totalDays };
-  }, [rawData]);
+  }, [rawData, filters]);
 
   const lojas = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
 
