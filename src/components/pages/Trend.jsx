@@ -185,6 +185,21 @@ export default function Trend() {
     return { rows, lojas };
   }, [baseData, rawData, periodo]);
 
+  const acumuladoData = useMemo(() => {
+    if (!periodo) return [];
+    const { ano } = periodo;
+    const meses = [...new Set(baseData.filter(r => r.Ano === ano || r.Ano === ano-1).map(r => r.Mes))].sort((a,b)=>a-b);
+    const MESES_ABREV = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    let acum26 = 0, acum25 = 0;
+    return meses.filter(m => m <= periodo.mes).map(m => {
+      const maxDia = m === periodo.mes ? periodo.lastDay : 31;
+      acum26 += sum(baseData.filter(r => r.Ano === ano   && r.Mes === m && r.Dia <= maxDia));
+      acum25 += sum(baseData.filter(r => r.Ano === ano-1 && r.Mes === m));
+      const varAcum = variation(acum26, acum25);
+      return { label: `${MESES_ABREV[m]}/${String(ano).slice(2)}`, acum26, acum25, varAcum };
+    });
+  }, [baseData, periodo]);
+
   if (!periodo || !mesAtual) return null;
 
   return (
