@@ -3,7 +3,7 @@
 
 import { useMemo } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  BarChart, Bar, ComposedChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine, Cell, LabelList
 } from 'recharts';
 import { TrendingUp, TrendingDown, Target, Calendar, Info } from 'lucide-react';
