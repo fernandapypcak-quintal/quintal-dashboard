@@ -96,8 +96,91 @@ export default function History() {
     { key: 'growth',  label: 'MoM %' },
   ];
 
+  // Últimos 12 meses × todas as lojas (ignora filtros de loja e canal)
+  const matrizLojas = useMemo(() => {
+    const lojas12 = [...new Set(rawData.map(r => r.Loja))].sort();
+    const meses12  = [...new Set(rawData.map(r => r.Ano_Mes))].sort().slice(-12);
+    return {
+      lojas: lojas12,
+      meses: meses12.map(key => {
+        const [anoS, mesS] = key.split('-');
+        const ano = Number(anoS), mes = Number(mesS);
+        const label = rawData.find(r => r.Ano_Mes === key)?.Ano_Mes_Label || key;
+        const porLoja = {};
+        lojas12.forEach(loja => {
+          porLoja[loja] = rawData.filter(r => r.Ano_Mes === key && r.Loja === loja)
+            .reduce((s,r) => s + r.Valor, 0);
+        });
+        const total = Object.values(porLoja).reduce((s,v) => s+v, 0);
+        return { key, label, porLoja, total };
+      }),
+    };
+  }, [rawData]);
+
   return (
     <div className="p-6 space-y-4 animate-fade-in">
+
+      {/* Matriz últimos 12 meses × lojas */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <h2 className="section-title">Últimos 12 Meses por Casa</h2>
+        </div>
+        <div className="bg-white border border-surface-border rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[900px]">
+              <thead>
+                <tr className="border-b border-surface-border bg-surface-muted/30">
+                  <th className="text-left py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider sticky left-0 bg-surface-muted/30">Período</th>
+                  {matrizLojas.lojas.map(loja => (
+                    <th key={loja} className="text-right py-3 px-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider whitespace-nowrap">{loja}</th>
+                  ))}
+                  <th className="text-right py-3 px-4 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matrizLojas.meses.map((m, idx) => {
+                  const prev = matrizLojas.meses[idx - 1];
+                  const mom  = prev ? ((m.total - prev.total) / prev.total * 100) : null;
+                  return (
+                    <tr key={m.key} className="border-b border-surface-border/50 hover:bg-surface-muted/20 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-brand-black sticky left-0 bg-white">
+                        {m.label}
+                        {mom !== null && (
+                          <span className={`ml-2 text-[10px] font-semibold ${mom >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {mom >= 0 ? '▲' : '▼'}{Math.abs(mom).toFixed(1).replace('.',',')}%
+                          </span>
+                        )}
+                      </td>
+                      {matrizLojas.lojas.map(loja => (
+                        <td key={loja} className="py-3 px-3 text-right font-mono text-xs text-zinc-600">
+                          {m.porLoja[loja] > 0 ? formatBRL(m.porLoja[loja], true) : <span className="text-zinc-200">—</span>}
+                        </td>
+                      ))}
+                      <td className="py-3 px-4 text-right font-mono text-sm font-bold text-brand-black">
+                        {formatBRL(m.total, true)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-surface-border bg-surface-muted/30">
+                  <td className="py-3 px-4 text-xs font-semibold text-zinc-500 sticky left-0 bg-surface-muted/30">TOTAL 12M</td>
+                  {matrizLojas.lojas.map(loja => (
+                    <td key={loja} className="py-3 px-3 text-right font-mono text-xs font-bold text-zinc-700">
+                      {formatBRL(matrizLojas.meses.reduce((s,m) => s + (m.porLoja[loja]||0), 0), true)}
+                    </td>
+                  ))}
+                  <td className="py-3 px-4 text-right font-mono text-sm font-bold text-brand-black">
+                    {formatBRL(matrizLojas.meses.reduce((s,m) => s + m.total, 0), true)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="section-title">Histórico Mensal</h2>
@@ -188,6 +271,7 @@ export default function History() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }
