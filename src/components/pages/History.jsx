@@ -12,7 +12,7 @@ function SortIcon({ field, sortField, sortDir }) {
 }
 
 export default function History() {
-  const { filteredData, rawData } = useFilters();
+  const { filteredData, rawData, filters } = useFilters();
   const { getMetaTotal } = useMetas();
   const [sortField, setSortField] = useState('key');
   const [sortDir, setSortDir]     = useState('desc');
@@ -21,6 +21,15 @@ export default function History() {
   const PER_PAGE = 20;
 
   const lojas = useMemo(() => [...new Set(rawData.map(r => r.Loja))].sort(), [rawData]);
+
+  // Últimos 12 meses — sem filtro de canal (sempre mostra tudo)
+  const ultimos12 = useMemo(() => {
+    const all = monthlyTotals(rawData.filter(r => {
+      if (filters.lojas.size > 0 && !filters.lojas.has(r.Loja)) return false;
+      return true;
+    }));
+    return all.slice(-12);
+  }, [rawData, filters]);
 
   const monthly = useMemo(() => {
     return monthlyTotals(filteredData).map((d, i, arr) => {

@@ -413,6 +413,65 @@ export default function Trend() {
         </ResponsiveContainer>
       </div>
 
+      {/* ── Acumulado do ano ── */}
+      {acumuladoData.length > 0 && (
+        <div className="chart-card">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="section-title">Acumulado do Ano — {periodo.ano}</h3>
+            <InfoTip text={`Faturamento acumulado de Janeiro até cada mês, comparando ${periodo.ano} com ${periodo.ano-1}. Linha verde = crescimento, vermelha = queda.`} />
+          </div>
+          <p className="text-xs text-zinc-400 mb-5">Acumulado Jan→mês vs mesmo período {periodo.ano-1}</p>
+          <ResponsiveContainer width="100%" height={240}>
+            <ComposedChart data={acumuladoData} margin={{top:12,right:16,left:0,bottom:0}}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F0F0EC" vertical={false}/>
+              <XAxis dataKey="label" tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false}/>
+              <YAxis tickFormatter={v=>formatBRL(v,true)} tick={{fontSize:11,fill:'#A1A1AA'}} axisLine={false} tickLine={false} width={80}/>
+              <Tooltip content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null;
+                const d = acumuladoData.find(x => x.label === label);
+                if (!d) return null;
+                return (
+                  <div className="bg-white border border-surface-border rounded-xl shadow-lg p-3 min-w-[200px]">
+                    <p className="text-xs font-semibold text-zinc-500 mb-2">{label} — Acumulado</p>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between gap-4">
+                        <span className="font-semibold text-brand-black">{periodo.ano}</span>
+                        <span className="font-bold text-brand-black">{formatBRL(d.acc26, true)}</span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-zinc-400">{periodo.ano-1}</span>
+                        <span className="text-zinc-400">{formatBRL(d.acc25, true)}</span>
+                      </div>
+                      {d.varAcc !== null && (
+                        <div className="flex justify-between gap-4 pt-1 border-t border-surface-border">
+                          <span className="text-zinc-400">Crescimento</span>
+                          <span className={`font-bold ${d.varAcc >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {d.varAcc >= 0 ? '+' : ''}{d.varAcc.toFixed(1).replace('.',',')}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }}/>
+              <Bar dataKey="acc25" name={String(periodo.ano-1)} fill="#E5E5E0" radius={[3,3,0,0]} maxBarSize={36}/>
+              <Bar dataKey="acc26" name={String(periodo.ano)} fill="#97A624" radius={[3,3,0,0]} maxBarSize={36}>
+                <LabelList content={(p) => {
+                  if (!showLabels) return null;
+                  const d = acumuladoData[p.index];
+                  if (!d || d.varAcc === null) return null;
+                  const clr = d.varAcc >= 0 ? '#16a34a' : '#dc2626';
+                  return <text x={(p.x||0)+(p.width||0)/2} y={(p.y||0)-6}
+                    textAnchor="middle" fontSize={9} fontWeight={700} fill={clr} fontFamily="DM Sans">
+                    {d.varAcc >= 0 ? '+' : ''}{d.varAcc.toFixed(1).replace('.',',')}%
+                  </text>;
+                }}/>
+              </Bar>
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* ── Média por dia da semana ── */}
       <div className="chart-card">
         <div className="flex items-center gap-2 mb-1">
