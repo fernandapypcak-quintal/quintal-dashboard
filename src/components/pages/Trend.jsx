@@ -196,7 +196,7 @@ export default function Trend() {
       acum26 += sum(baseData.filter(r => r.Ano === ano   && r.Mes === m && r.Dia <= maxDia));
       acum25 += sum(baseData.filter(r => r.Ano === ano-1 && r.Mes === m));
       const varAcum = variation(acum26, acum25);
-      return { label: `${MESES_ABREV[m]}/${String(ano).slice(2)}`, acum26, acum25, varAcum };
+      return { label: `${MESES_ABREV[m]}/${String(ano).slice(2)}`, acc26: acum26, acc25: acum25, varAcc: variation(acum26, acum25) };
     });
   }, [baseData, periodo]);
 
