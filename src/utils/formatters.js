@@ -62,30 +62,43 @@ export function monthlyTotals(recs) {
 // Médias: todos os dias com dados (1..lastDay)
 // Projeção: dias lastDay+1..totalDays
 // Dia_Semana_Num 0=Dom..6=Sáb = JS getDay()
-// Feriados nacionais + municipais SP + emendas 2025-2026
-// Dias atípicos: a média desse DOW é multiplicada por 1.3 na projeção
+// Feriados nacionais + municipais SP + emendas + sábados atípicos 2025-2027
+// Dias excluídos do cálculo da média DOW (não puxam a média para baixo)
 export const DIAS_ATIPICOS = {
   '2025-01-01':'feriado','2025-01-25':'feriado',
-  '2025-03-03':'feriado','2025-03-04':'feriado',
-  '2025-04-18':'feriado','2025-04-21':'feriado',
-  '2025-05-01':'feriado','2025-05-02':'emenda',
-  '2025-06-19':'feriado','2025-06-20':'emenda',
+  '2025-03-03':'emenda','2025-03-04':'feriado',
+  '2025-04-18':'feriado','2025-04-19':'sabado-feriado','2025-04-21':'feriado',
+  '2025-05-01':'feriado','2025-05-02':'emenda','2025-05-03':'sabado-feriado',
+  '2025-06-19':'feriado','2025-06-20':'emenda','2025-06-21':'sabado-feriado',
   '2025-07-09':'feriado',
   '2025-09-07':'feriado','2025-10-12':'feriado',
   '2025-11-02':'feriado','2025-11-15':'feriado',
-  '2025-11-20':'feriado','2025-11-21':'emenda',
-  '2025-12-25':'feriado','2025-12-26':'emenda',
-  '2026-01-01':'feriado','2026-01-02':'emenda',
+  '2025-11-20':'feriado','2025-11-21':'emenda','2025-11-22':'sabado-feriado',
+  '2025-12-25':'feriado','2025-12-26':'emenda','2025-12-27':'sabado-feriado',
+  '2026-01-01':'feriado','2026-01-02':'emenda','2026-01-03':'sabado-feriado',
   '2026-01-25':'feriado',
-  '2026-02-16':'feriado','2026-02-17':'feriado',
-  '2026-04-03':'feriado','2026-04-20':'emenda','2026-04-21':'feriado',
-  '2026-05-01':'feriado',
-  '2026-06-04':'feriado','2026-06-05':'emenda',
-  '2026-07-09':'feriado','2026-07-10':'emenda',
+  '2026-02-16':'emenda','2026-02-17':'feriado',
+  '2026-04-03':'feriado','2026-04-04':'sabado-feriado',
+  '2026-04-20':'emenda','2026-04-21':'feriado',
+  '2026-05-01':'feriado','2026-05-02':'sabado-feriado',
+  '2026-06-04':'feriado','2026-06-05':'emenda','2026-06-06':'sabado-feriado',
+  '2026-07-09':'feriado','2026-07-10':'emenda','2026-07-11':'sabado-feriado',
   '2026-09-07':'feriado','2026-10-12':'feriado',
   '2026-11-02':'feriado','2026-11-15':'feriado',
-  '2026-11-20':'feriado','2026-12-25':'feriado',
+  '2026-11-20':'feriado','2026-11-21':'sabado-feriado',
+  '2026-12-25':'feriado','2026-12-26':'sabado-feriado',
+  '2027-01-01':'feriado','2027-01-02':'sabado-feriado','2027-01-25':'feriado',
+  '2027-02-08':'emenda','2027-02-09':'feriado',
+  '2027-03-26':'feriado','2027-03-27':'sabado-feriado','2027-04-21':'feriado',
+  '2027-05-01':'feriado',
+  '2027-05-27':'feriado','2027-05-28':'emenda','2027-05-29':'sabado-feriado',
+  '2027-07-09':'feriado','2027-07-10':'sabado-feriado',
+  '2027-09-06':'emenda','2027-09-07':'feriado',
+  '2027-10-11':'emenda','2027-10-12':'feriado',
+  '2027-11-01':'emenda','2027-11-02':'feriado',
+  '2027-11-15':'feriado','2027-11-20':'feriado','2027-12-25':'feriado',
 };
+
 
 export function calcTendFat(recs, lastDay, totalDays, ano, mes) {
   if (!recs.length || lastDay >= totalDays) return sum(recs);
@@ -112,18 +125,11 @@ export function calcTendFat(recs, lastDay, totalDays, ano, mes) {
   }
 
   // Projeção: dias lastDay+1 até fim do mês
-  // Se o dia projetado for atípico, aplica +30% (feriado próximo = compensação)
+  // Usa a média limpa (sem dias atípicos) — projeção realista
   let proj = 0;
-  const diasAtipicosExcluidos = [];
   for (let d = lastDay + 1; d <= totalDays; d++) {
-    const dt  = new Date(ano, mes-1, d);
-    const dow = dt.getDay();
-    const ds  = `${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isAtipico = !!DIAS_ATIPICOS[ds];
-    const media = mediaDow[dow] || 0;
-    // Dia atípico na projeção: aplica 30% a mais pois haverá compensação
-    proj += isAtipico ? media * 1.3 : media;
-    if (isAtipico) diasAtipicosExcluidos.push({ dia: d, tipo: DIAS_ATIPICOS[ds] });
+    const dow = new Date(ano, mes-1, d).getDay();
+    proj += mediaDow[dow] || 0;
   }
 
   return sum(recs) + proj;
