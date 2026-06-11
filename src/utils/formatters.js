@@ -62,25 +62,85 @@ export function monthlyTotals(recs) {
 // Médias: todos os dias com dados (1..lastDay)
 // Projeção: dias lastDay+1..totalDays
 // Dia_Semana_Num 0=Dom..6=Sáb = JS getDay()
+// Feriados nacionais + municipais SP + emendas 2025-2026
+// Dias atípicos: a média desse DOW é multiplicada por 1.3 na projeção
+export const DIAS_ATIPICOS = {
+  '2025-01-01':'feriado','2025-01-25':'feriado',
+  '2025-03-03':'feriado','2025-03-04':'feriado',
+  '2025-04-18':'feriado','2025-04-21':'feriado',
+  '2025-05-01':'feriado','2025-05-02':'emenda',
+  '2025-06-19':'feriado','2025-06-20':'emenda',
+  '2025-07-09':'feriado',
+  '2025-09-07':'feriado','2025-10-12':'feriado',
+  '2025-11-02':'feriado','2025-11-15':'feriado',
+  '2025-11-20':'feriado','2025-11-21':'emenda',
+  '2025-12-25':'feriado','2025-12-26':'emenda',
+  '2026-01-01':'feriado','2026-01-02':'emenda',
+  '2026-01-25':'feriado',
+  '2026-02-16':'feriado','2026-02-17':'feriado',
+  '2026-04-03':'feriado','2026-04-20':'emenda','2026-04-21':'feriado',
+  '2026-05-01':'feriado',
+  '2026-06-04':'feriado','2026-06-05':'emenda',
+  '2026-07-09':'feriado','2026-07-10':'emenda',
+  '2026-09-07':'feriado','2026-10-12':'feriado',
+  '2026-11-02':'feriado','2026-11-15':'feriado',
+  '2026-11-20':'feriado','2026-12-25':'feriado',
+};
+
 export function calcTendFat(recs, lastDay, totalDays, ano, mes) {
   if (!recs.length || lastDay >= totalDays) return sum(recs);
 
-  // Médias calculadas com TODOS os dias com dados (incluindo lastDay)
-  // Dados são sempre D-1 (ontem fechado), então todos os dias são válidos
+  // Médias por DOW — dias atípicos (feriados/emendas) são excluídos da média
+  // pois representam faturamento abaixo do normal e distorceriam a projeção
   const mediaDow = {};
   for (let dow = 0; dow < 7; dow++) {
-    const r = recs.filter(x => x.Dia_Semana_Num === dow);
-    const dias = new Set(r.map(x => x.Dia)).size;
-    mediaDow[dow] = dias > 0 ? sum(r) / dias : 0;
+    const r = recs.filter(x => {
+      if (x.Dia_Semana_Num !== dow) return false;
+      // Exclui dias atípicos do cálculo da média
+      const ds = `${ano}-${String(mes).padStart(2,'0')}-${String(x.Dia).padStart(2,'0')}`;
+      return !DIAS_ATIPICOS[ds];
+    });
+    const diasNormais = new Set(r.map(x => x.Dia)).size;
+    if (diasNormais > 0) {
+      mediaDow[dow] = sum(r) / diasNormais;
+    } else {
+      // Sem dias normais — usa todos (incluindo atípicos) como fallback
+      const rAll  = recs.filter(x => x.Dia_Semana_Num === dow);
+      const dAll  = new Set(rAll.map(x => x.Dia)).size;
+      mediaDow[dow] = dAll > 0 ? sum(rAll) / dAll : 0;
+    }
   }
 
   // Projeção: dias lastDay+1 até fim do mês
+  // Se o dia projetado for atípico, aplica +30% (feriado próximo = compensação)
   let proj = 0;
+  const diasAtipicosExcluidos = [];
   for (let d = lastDay + 1; d <= totalDays; d++) {
-    proj += mediaDow[new Date(ano, mes-1, d).getDay()] || 0;
+    const dt  = new Date(ano, mes-1, d);
+    const dow = dt.getDay();
+    const ds  = `${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isAtipico = !!DIAS_ATIPICOS[ds];
+    const media = mediaDow[dow] || 0;
+    // Dia atípico na projeção: aplica 30% a mais pois haverá compensação
+    proj += isAtipico ? media * 1.3 : media;
+    if (isAtipico) diasAtipicosExcluidos.push({ dia: d, tipo: DIAS_ATIPICOS[ds] });
   }
 
   return sum(recs) + proj;
+}
+
+// Retorna quais dias atípicos existem no mês (para mostrar no dashboard)
+export function getDiasAtipicos(ano, mes) {
+  const totalDays = daysInMonth(ano, mes);
+  const result = [];
+  for (let d = 1; d <= totalDays; d++) {
+    const ds = `${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if (DIAS_ATIPICOS[ds]) {
+      result.push({ dia: d, data: ds, tipo: DIAS_ATIPICOS[ds],
+        dow: new Date(ano, mes-1, d).getDay() });
+    }
+  }
+  return result;
 }
 
 // Totais por dia da semana (para gráfico DOW)

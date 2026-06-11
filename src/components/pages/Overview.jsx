@@ -16,7 +16,7 @@ import { CustomTooltip } from '../ui/ChartTooltip';
 import InfoTip from '../ui/InfoTip';
 import {
   sum, variation, monthlyTotals, dowTotals, calcTendFat, daysInMonth,
-  formatBRL, formatPct, formatPctPlain, DOW_FULL, DOW_ABREV
+  formatBRL, formatPct, formatPctPlain, DOW_FULL, DOW_ABREV, getDiasAtipicos
 } from '../../utils/formatters';
 
 // ── helpers ──────────────────────────────────────────────────────
@@ -274,6 +274,26 @@ export default function Overview() {
         </div>
       )}
 
+      {/* Dias atípicos do mês */}
+      {periodo && (() => {
+        const atipicos = getDiasAtipicos(periodo.ano, periodo.mes);
+        if (!atipicos.length) return null;
+        const DOW_ABREV2 = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+        const feriados = atipicos.filter(d => d.tipo === 'feriado');
+        const emendas  = atipicos.filter(d => d.tipo === 'emenda');
+        return (
+          <div className="flex items-start gap-2 text-xs text-violet-700 bg-violet-50 border border-violet-200 rounded-xl px-4 py-2.5">
+            <span className="flex-shrink-0 mt-0.5">🗓️</span>
+            <div>
+              <span className="font-semibold">Dias atípicos em {periodo.label} — </span>
+              <span>a Tend Fat exclui esses dias das médias e aplica +30% na projeção: </span>
+              {feriados.length > 0 && <span className="font-semibold">Feriados: {feriados.map(d => `${DOW_ABREV2[d.dow]} ${d.dia}/${periodo.mes}`).join(', ')}</span>}
+              {emendas.length > 0 && <span className="ml-2 text-violet-500">· Emendas: {emendas.map(d => `${DOW_ABREV2[d.dow]} ${d.dia}/${periodo.mes}`).join(', ')}</span>}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard title="Faturamento Total" value={kpis.total} icon={DollarSign} accent="#97A624"
@@ -301,48 +321,35 @@ export default function Overview() {
       {/* ── TICKET MÉDIO + DESCONTO ── */}
       {periodo && (() => {
         const lojasF = filters.lojas;
-        // Busca apenas o número de compradores do hook
-        const tk    = getTicket(periodo.ano, periodo.mes, null,       lojasF);
-        const tkSal = getTicket(periodo.ano, periodo.mes, 'CASA',     lojasF);
-        const tkDel = getTicket(periodo.ano, periodo.mes, 'DELIVERY', lojasF);
-        const dsc   = getDesconto(periodo.ano, periodo.mes, lojasF);
+        const tk     = getTicket(periodo.ano, periodo.mes, null,       lojasF);
+        const tkSal  = getTicket(periodo.ano, periodo.mes, 'CASA',     lojasF);
+        const tkDel  = getTicket(periodo.ano, periodo.mes, 'DELIVERY', lojasF);
+        const dsc    = getDesconto(periodo.ano, periodo.mes, lojasF);
         if (tk.pessoas === 0) return null;
-
-        // Faturamento real do período (já filtrado por loja/canal via baseData)
-        const recsMesAtual = baseData.filter(r => r.Ano === periodo.ano && r.Mes === periodo.mes);
-        const fatTotal  = sum(recsMesAtual);
-        const fatSalao  = sum(recsMesAtual.filter(r => r.Canal === 'CASA'));
-        const fatDel    = sum(recsMesAtual.filter(r => r.Canal === 'DELIVERY'));
-
-        // Ticket médio = faturamento / compradores (metodologia Zig)
-        const ticketTotal = tk.pessoas    > 0 ? fatTotal / tk.pessoas    : 0;
-        const ticketSal   = tkSal.pessoas > 0 ? fatSalao / tkSal.pessoas : 0;
-        const ticketDel   = tkDel.pessoas > 0 ? fatDel   / tkDel.pessoas : 0;
-
         return (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border border-surface-border rounded-2xl p-5">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Médio</p>
-                <InfoTip text="Faturamento total dividido pelo número de compradores no período (metodologia Zig)." />
+                <InfoTip text="Faturamento total dividido pelo número de compradores no período." />
               </div>
-              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(ticketTotal)}</p>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tk.ticket)}</p>
               <p className="text-xs text-zinc-400 mt-1">{tk.pessoas.toLocaleString('pt-BR')} pessoas</p>
             </div>
             <div className="bg-white border border-surface-border rounded-2xl p-5">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Salão</p>
-                <InfoTip text="Faturamento salão dividido pelo número de compradores no canal Casa." />
+                <InfoTip text="Ticket médio por pessoa no canal Salão." />
               </div>
-              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(ticketSal)}</p>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tkSal.ticket)}</p>
               <p className="text-xs text-zinc-400 mt-1">{tkSal.pessoas.toLocaleString('pt-BR')} pessoas</p>
             </div>
             <div className="bg-white border border-surface-border rounded-2xl p-5">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Ticket Delivery</p>
-                <InfoTip text="Faturamento delivery dividido pelo número de pedidos no canal Delivery." />
+                <InfoTip text="Ticket médio por pedido no canal Delivery." />
               </div>
-              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(ticketDel)}</p>
+              <p className="text-2xl font-bold font-display text-brand-black">{formatBRL(tkDel.ticket)}</p>
               <p className="text-xs text-zinc-400 mt-1">{tkDel.pessoas.toLocaleString('pt-BR')} pedidos</p>
             </div>
             <div className="bg-white border border-surface-border rounded-2xl p-5">
