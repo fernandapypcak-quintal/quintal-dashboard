@@ -1,7 +1,7 @@
 // src/components/layout/Header.jsx
 import { useState } from 'react';
 import { SlidersHorizontal, Tag, X, ChevronDown, Filter, Printer, Zap } from 'lucide-react';
-import PrintReport from '../pages/Print';
+import PrintReport, { PrintWeekend } from '../pages/Print';
 import { useFilters } from '../../hooks/useFilters';
 import { useLabels } from '../../hooks/useLabels';
 import MultiSelect from '../ui/MultiSelect';
@@ -26,6 +26,7 @@ export default function Header({ activePage }) {
   const { showLabels, toggleLabels } = useLabels();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [printingWeekend, setPrintingWeekend] = useState(false);
 
   const mesesAtivos = [...filters.meses];
   const mesLabel = mesesAtivos.length === 1
@@ -130,6 +131,13 @@ export default function Header({ activePage }) {
           </button>
 
           {/* Imprimir */}
+          <button
+            onClick={() => setPrintingWeekend(true)}
+            title="Relatório de Final de Semana (Sex/Sáb/Dom)"
+            className="hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border border-surface-border text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 transition-colors">
+            <Printer size={13}/>
+            <span className="hidden lg:inline">FDS</span>
+          </button>
           <button
             onClick={() => setPrinting(true)}
             className="hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-xl border border-surface-border text-zinc-500 hover:border-zinc-400 hover:text-zinc-700 transition-colors">

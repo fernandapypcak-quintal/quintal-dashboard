@@ -74,24 +74,12 @@ export default function PrintReport({ onClose }) {
       return { loja, v26, v25, var: variation(v26, v25) };
     }).filter(l => l.v26 > 0).sort((a,b) => b.v26 - a.v26);
 
-    // Média por dia da semana (igual à Visão Geral)
-    const dowStats = [0,1,2,3,4,5,6].map(dow => {
-      const recsD = recs.filter(r => r.Dia_Semana_Num === dow);
-      const dias  = [...new Set(recsD.map(r => r.Data))].length;
-      const media = dias > 0 ? sum(recsD) / dias : 0;
-      const recsDAA = rawData.filter(r => r.Ano === ano-1 && r.Mes === mes && r.Dia_Semana_Num === dow);
-      const diasAA  = [...new Set(recsDAA.map(r => r.Data))].length;
-      const mediaAA = diasAA > 0 ? sum(recsDAA) / diasAA : 0;
-      return { dow, nome: DOW_NAMES[dow], media, mediaAA, dias,
-               var: mediaAA > 0 ? (media - mediaAA) / mediaAA * 100 : null };
-    }).filter(d => d.dias > 0);
-
     return { ano, mes, lastDay, totalDays, key,
       label: `${MESES[mes]}/${ano}`,
       total, casa, delivery, yoy, tendFat, tendVsAA,
       pctCasa: total>0?casa/total*100:0,
       pctDel:  total>0?delivery/total*100:0,
-      porLoja, dowStats,
+      porLoja,
       ontem: { dow: DOW_NAMES[ontem.getDay()], dia:diaO, mes:mesO, ano:anoO,
                total:totalO, totalAA:sum(recsOAA), yoy:yoyO,
                casa:casaO, delivery:delO, porLoja:porLojaO } };
@@ -309,39 +297,6 @@ export default function PrintReport({ onClose }) {
   </tfoot>
 </table>
 
-<!-- 4. MÉDIA POR DIA DA SEMANA -->
-<div class="section-title">4. Média de Faturamento por Dia da Semana — ${data.label}</div>
-<table>
-  <thead>
-    <tr>
-      <th style="text-align:left">Dia da Semana</th>
-      <th>Ocorrências</th>
-      <th>Média ${data.ano}</th>
-      <th>Média ${data.ano - 1}</th>
-      <th>Variação YoY</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${data.dowStats.sort((a,b) => b.media - a.media).map(d => `
-    <tr>
-      <td style="font-weight:600">${d.nome}</td>
-      <td style="color:#888;text-align:center">${d.dias}x</td>
-      <td style="font-weight:700">${fmt(d.media)}</td>
-      <td style="color:#999">${d.mediaAA > 0 ? fmt(d.mediaAA) : '—'}</td>
-      <td class="${d.var===null?'':d.var>=0?'pos':'neg'}">${d.var !== null ? pct(d.var) : '—'}</td>
-    </tr>`).join('')}
-  </tbody>
-  <tfoot>
-    <tr class="tfoot">
-      <td>Média diária geral</td>
-      <td></td>
-      <td style="font-weight:700">${fmt(data.total / data.lastDay)}</td>
-      <td></td>
-      <td></td>
-    </tr>
-  </tfoot>
-</table>
-
 <!-- FOOTER -->
 <div class="footer">
   <span>Quintal do Espeto · Dashboard de Faturamento</span>
@@ -350,6 +305,193 @@ export default function PrintReport({ onClose }) {
 
 </body>
 </html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  onClose?.();
+  return null;
+}
+
+export function PrintWeekend({ onClose }) {
+  const { rawData } = useFilters();
+
+  const data = useMemo(() => {
+    if (!rawData.length) return null;
+
+    // Última sexta, sábado e domingo com dados
+    const hoje  = new Date();
+    // Acha o último domingo com dados
+    const datas = [...new Set(rawData.map(r => r.Data))].sort().reverse();
+    
+    // Pega os últimos 3 dias que sejam sex/sab/dom
+    const diasFds = [];
+    for (const dt of datas) {
+      const d   = new Date(dt + 'T12:00:00');
+      const dow = d.getDay(); // 0=dom, 5=sex, 6=sab
+      if (dow === 5 || dow === 6 || dow === 0) {
+        if (!diasFds.find(x => x.data === dt)) {
+          diasFds.push({ data: dt, dow, d });
+        }
+      }
+      if (diasFds.length === 3) break;
+    }
+
+    // Ordena sex → sab → dom
+    diasFds.sort((a,b) => a.data.localeCompare(b.data));
+
+    const lojas = [...new Set(rawData.map(r => r.Loja))].sort();
+    const DOW_NAMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+    const dias = diasFds.map(({ data, dow, d }) => {
+      const recs = rawData.filter(r => r.Data === data);
+      const recsAA = rawData.filter(r => {
+        const dAA = new Date(d); dAA.setFullYear(d.getFullYear() - 1);
+        // Mesmo dia da semana mais próximo no ano anterior
+        const dtAA = new Date(dAA);
+        return r.Data === `${dtAA.getFullYear()}-${String(dtAA.getMonth()+1).padStart(2,'0')}-${String(dtAA.getDate()).padStart(2,'0')}`;
+      });
+
+      const porLoja = lojas.map(loja => {
+        const v26 = sum(recs.filter(r => r.Loja === loja));
+        const v25 = sum(recsAA.filter(r => r.Loja === loja));
+        return { loja, v26, v25, yoy: variation(v26, v25) };
+      }).filter(l => l.v26 > 0 || l.v25 > 0);
+
+      const total26 = sum(recs);
+      const total25 = sum(recsAA);
+
+      return { data, dow, label: DOW_NAMES[dow],
+               dataFmt: d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}),
+               porLoja, total26, total25, yoy: variation(total26, total25) };
+    });
+
+    return { dias, lojas, geradoEm: new Date().toLocaleString('pt-BR') };
+  }, [rawData]);
+
+  if (!data) return null;
+
+  function fmt(v) { return formatBRL(v, true); }
+  function pct(v) {
+    if (v === null || v === undefined) return '—';
+    return (v >= 0 ? '+' : '') + v.toFixed(1).replace('.', ',') + '%';
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>Faturamento Final de Semana — Quintal do Espeto</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10px; color: #1a1a1a;
+         background: white; padding: 16px; }
+  .header { display:flex; justify-content:space-between; align-items:center;
+    border-bottom: 3px solid #1F3D2E; padding-bottom: 10px; margin-bottom: 14px; }
+  .header h1 { font-size: 17px; font-weight: 800; color: #1F3D2E; }
+  .header .sub { font-size: 9px; color: #666; margin-top: 2px; }
+  .section-title { font-size:12px; font-weight:700; color:#1F3D2E;
+    border-left:4px solid #97A624; padding-left:8px; margin:14px 0 8px; }
+  .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+  .kpi { border:1px solid #e5e5e5; border-radius:8px; padding:9px 11px; }
+  .kpi-label { font-size:8px; font-weight:700; color:#888; text-transform:uppercase;
+    letter-spacing:0.5px; margin-bottom:3px; }
+  .kpi-value { font-size:20px; font-weight:800; }
+  .kpi-var { font-size:9px; font-weight:700; margin-top:3px; }
+  table { width:100%; border-collapse:collapse; font-size:10px; margin-bottom:16px; }
+  th { background:#1F3D2E; color:white; font-weight:700; padding:5px 8px;
+    text-align:right; font-size:8px; text-transform:uppercase; }
+  th:first-child { text-align:left; }
+  td { padding:4px 8px; text-align:right; border-bottom:1px solid #f0f0f0; }
+  td:first-child { text-align:left; font-weight:600; }
+  tr:nth-child(even) td { background:#fafafa; }
+  .tfoot td { background:#f0f4ec !important; font-weight:700; border-top:2px solid #1F3D2E; }
+  .pos { color:#16a34a; } .neg { color:#dc2626; }
+  .footer { margin-top:14px; padding-top:8px; border-top:1px solid #e5e5e5;
+    font-size:8px; color:#999; display:flex; justify-content:space-between; }
+  @media print {
+    body { padding:8mm; }
+    .no-print { display:none !important; }
+    @page { size: A4 landscape; margin:8mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print" style="margin-bottom:14px;display:flex;gap:8px;">
+  <button onclick="window.print()"
+    style="background:#1F3D2E;color:white;border:none;padding:7px 18px;
+    border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">
+    🖨️ Imprimir / Salvar PDF
+  </button>
+  <button onclick="window.close()"
+    style="background:#f5f5f5;color:#333;border:1px solid #ddd;padding:7px 14px;
+    border-radius:6px;font-size:12px;cursor:pointer;">
+    Fechar
+  </button>
+</div>
+
+<div class="header">
+  <div>
+    <h1>Quintal do Espeto — Final de Semana</h1>
+    <div class="sub">Faturamento por dia e por casa · Gerado em ${data.geradoEm}</div>
+  </div>
+  <div style="background:#1F3D2E;color:white;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;">
+    ${data.dias.map(d => d.label).join(' · ')}
+  </div>
+</div>
+
+<!-- KPIs dos 3 dias -->
+<div class="kpi-row">
+  ${data.dias.map(d => `
+  <div class="kpi">
+    <div class="kpi-label">${d.label} · ${d.dataFmt}</div>
+    <div class="kpi-value">${fmt(d.total26)}</div>
+    ${d.yoy !== null ? `<div class="kpi-var ${d.yoy>=0?'pos':'neg'}">${pct(d.yoy)} vs mesmo ${d.label} ${new Date(d.data+'T12:00:00').getFullYear()-1}</div>` : ''}
+  </div>`).join('')}
+</div>
+
+<!-- Tabela por loja por dia -->
+${data.dias.map(d => `
+<div class="section-title">${d.label} — ${d.dataFmt}</div>
+<table>
+  <thead>
+    <tr>
+      <th style="text-align:left">Loja</th>
+      <th>${new Date(d.data+'T12:00:00').getFullYear()}</th>
+      <th>${new Date(d.data+'T12:00:00').getFullYear()-1}</th>
+      <th>Variação YoY</th>
+      <th>Share</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${d.porLoja.map(l => `
+    <tr>
+      <td>${l.loja}</td>
+      <td style="font-weight:700">${fmt(l.v26)}</td>
+      <td style="color:#999">${l.v25>0?fmt(l.v25):'—'}</td>
+      <td class="${l.yoy>=0?'pos':'neg'}">${l.v25>0?pct(l.yoy):'—'}</td>
+      <td>${d.total26>0?(l.v26/d.total26*100).toFixed(1).replace('.',',')+'%':'—'}</td>
+    </tr>`).join('')}
+  </tbody>
+  <tfoot>
+    <tr class="tfoot">
+      <td>TOTAL</td>
+      <td>${fmt(d.total26)}</td>
+      <td style="color:#666">${d.total25>0?fmt(d.total25):'—'}</td>
+      <td class="${d.yoy>=0?'pos':'neg'}">${pct(d.yoy)}</td>
+      <td>100%</td>
+    </tr>
+  </tfoot>
+</table>`).join('')}
+
+<div class="footer">
+  <span>Quintal do Espeto · Relatório de Final de Semana</span>
+  <span>${data.geradoEm}</span>
+</div>
+
+</body>
+</html>\`;
 
   const blob = new Blob([html], { type: 'text/html' });
   const url  = URL.createObjectURL(blob);
