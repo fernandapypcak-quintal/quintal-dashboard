@@ -105,31 +105,30 @@ export function calcTendFat(recs, lastDay, totalDays, ano, mes) {
 
   // Médias por DOW — dias atípicos (feriados/emendas) são excluídos da média
   // pois representam faturamento abaixo do normal e distorceriam a projeção
+  // Calcula média por DOW
+  // Dias atípicos passados entram com valor × 1.3 (corrige o dia ruim na projeção)
   const mediaDow = {};
   for (let dow = 0; dow < 7; dow++) {
-    const r = recs.filter(x => {
-      if (x.Dia_Semana_Num !== dow) return false;
-      // Exclui dias atípicos do cálculo da média
+    const r = recs.filter(x => x.Dia_Semana_Num === dow);
+    const dias = new Set(r.map(x => x.Dia)).size;
+    if (dias === 0) { mediaDow[dow] = 0; continue; }
+    // Soma: dias normais com valor real, dias atípicos com valor × 1.3
+    const totalAjustado = r.reduce((s, x) => {
       const ds = `${ano}-${String(mes).padStart(2,'0')}-${String(x.Dia).padStart(2,'0')}`;
-      return !DIAS_ATIPICOS[ds];
-    });
-    const diasNormais = new Set(r.map(x => x.Dia)).size;
-    if (diasNormais > 0) {
-      mediaDow[dow] = sum(r) / diasNormais;
-    } else {
-      // Sem dias normais — usa todos (incluindo atípicos) como fallback
-      const rAll  = recs.filter(x => x.Dia_Semana_Num === dow);
-      const dAll  = new Set(rAll.map(x => x.Dia)).size;
-      mediaDow[dow] = dAll > 0 ? sum(rAll) / dAll : 0;
-    }
+      return s + (DIAS_ATIPICOS[ds] ? x.Valor * 1.3 : x.Valor);
+    }, 0);
+    mediaDow[dow] = totalAjustado / dias;
   }
 
   // Projeção: dias lastDay+1 até fim do mês
-  // Usa a média limpa (sem dias atípicos) — projeção realista
+  // Dias atípicos futuros recebem +30% sobre a média do DOW
+  // (feriado/emenda/sábado atípico = compensação de movimento)
   let proj = 0;
   for (let d = lastDay + 1; d <= totalDays; d++) {
     const dow = new Date(ano, mes-1, d).getDay();
-    proj += mediaDow[dow] || 0;
+    const ds  = `${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const media = mediaDow[dow] || 0;
+    proj += DIAS_ATIPICOS[ds] ? media * 1.3 : media;
   }
 
   return sum(recs) + proj;
