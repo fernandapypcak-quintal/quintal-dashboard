@@ -329,6 +329,8 @@ export function PrintWeekend({ onClose }) {
       if (diasFds.length === 3) break;
     }
     diasFds.sort((a,b) => a.data.localeCompare(b.data));
+    console.log('[PrintWeekend] diasFds:', diasFds.map(x => x.data + ' dow=' + x.dow));
+    console.log('[PrintWeekend] rawData sample:', rawData[0]);
     const lojas = [...new Set(rawData.map(r => r.Loja))].sort();
     const DOW_NAMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
     const dias = diasFds.map(({ data, dow, d }) => {
