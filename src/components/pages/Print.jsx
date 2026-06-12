@@ -316,43 +316,43 @@ export default function PrintReport({ onClose }) {
 export function PrintWeekend({ onClose }) {
   const { rawData } = useFilters();
 
-  const data = useMemo(() => {
-    if (!rawData.length) return null;
-    const datas = [...new Set(rawData.map(r => r.Data))].sort().reverse();
-    const diasFds = [];
-    for (const dt of datas) {
-      const d = new Date(dt + 'T12:00:00');
-      const dow = d.getDay();
-      if ((dow === 5 || dow === 6 || dow === 0) && !diasFds.find(x => x.data === dt)) {
-        diasFds.push({ data: dt, dow, d });
-      }
-      if (diasFds.length === 3) break;
-    }
-    diasFds.sort((a,b) => a.data.localeCompare(b.data));
-    console.log('[PrintWeekend] diasFds:', diasFds.map(x => x.data + ' dow=' + x.dow));
-    console.log('[PrintWeekend] rawData sample:', rawData[0]);
-    const lojas = [...new Set(rawData.map(r => r.Loja))].sort();
-    const DOW_NAMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
-    const dias = diasFds.map(({ data, dow, d }) => {
-      const recs = rawData.filter(r => r.Data === data);
-      const dAA  = new Date(d); dAA.setFullYear(d.getFullYear() - 1);
-      const dataAA = dAA.getFullYear() + '-' + String(dAA.getMonth()+1).padStart(2,'0') + '-' + String(dAA.getDate()).padStart(2,'0');
-      const recsAA = rawData.filter(r => r.Data === dataAA);
-      const porLoja = lojas.map(loja => ({
-        loja,
-        v26: sum(recs.filter(r => r.Loja === loja)),
-        v25: sum(recsAA.filter(r => r.Loja === loja)),
-      })).filter(l => l.v26 > 0 || l.v25 > 0);
-      porLoja.forEach(l => { l.yoy = variation(l.v26, l.v25); });
-      const total26 = sum(recs), total25 = sum(recsAA);
-      return { data, dow, label: DOW_NAMES[dow],
-        dataFmt: d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}),
-        ano: d.getFullYear(), porLoja, total26, total25, yoy: variation(total26, total25) };
-    });
-    return { dias, lojas, geradoEm: new Date().toLocaleString('pt-BR') };
-  }, [rawData]);
+  if (!rawData.length) { onClose?.(); return null; }
 
-  if (!data) return null;
+  const datas = [...new Set(rawData.map(r => r.Data))].filter(Boolean).sort().reverse();
+  const diasFds = [];
+  for (const dt of datas) {
+    const d = new Date(dt + 'T12:00:00');
+    const dow = d.getDay();
+    if ((dow === 5 || dow === 6 || dow === 0) && !diasFds.find(x => x.data === dt)) {
+      diasFds.push({ data: dt, dow, d });
+    }
+    if (diasFds.length === 3) break;
+  }
+  diasFds.sort((a,b) => a.data.localeCompare(b.data));
+
+  if (!diasFds.length) { onClose?.(); return null; }
+
+  const lojas = [...new Set(rawData.map(r => r.Loja))].sort();
+  const DOW_NAMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
+  const dias = diasFds.map(({ data, dow, d }) => {
+    const recs   = rawData.filter(r => r.Data === data);
+    const dAA    = new Date(d); dAA.setFullYear(d.getFullYear() - 1);
+    const dataAA = dAA.getFullYear() + '-' + String(dAA.getMonth()+1).padStart(2,'0') + '-' + String(dAA.getDate()).padStart(2,'0');
+    const recsAA = rawData.filter(r => r.Data === dataAA);
+    const porLoja = lojas.map(loja => ({
+      loja,
+      v26: sum(recs.filter(r => r.Loja === loja)),
+      v25: sum(recsAA.filter(r => r.Loja === loja)),
+    })).filter(l => l.v26 > 0 || l.v25 > 0);
+    porLoja.forEach(l => { l.yoy = variation(l.v26, l.v25); });
+    const total26 = sum(recs), total25 = sum(recsAA);
+    return { data, dow, label: DOW_NAMES[dow],
+      dataFmt: d.toLocaleDateString('pt-BR',{day:'numeric',month:'short',year:'numeric'}),
+      ano: d.getFullYear(), porLoja, total26, total25, yoy: variation(total26, total25) };
+  });
+
+  const geradoEm = new Date().toLocaleString('pt-BR');
 
   function fmt(v) { return formatBRL(v, true); }
   function pct(v) {
@@ -360,83 +360,50 @@ export function PrintWeekend({ onClose }) {
     return (v >= 0 ? '+' : '') + v.toFixed(1).replace('.', ',') + '%';
   }
 
-  const css = [
-    '* { margin:0; padding:0; box-sizing:border-box; }',
-    'body { font-family: Arial, sans-serif; font-size: 10px; color: #1a1a1a; background: white; padding: 16px; }',
-    '.header { display:flex; justify-content:space-between; align-items:center; border-bottom: 3px solid #1F3D2E; padding-bottom: 10px; margin-bottom: 14px; }',
-    '.header h1 { font-size: 17px; font-weight: 800; color: #1F3D2E; }',
-    '.header .sub { font-size: 9px; color: #666; margin-top: 2px; }',
-    '.kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }',
-    '.kpi { border:1px solid #e5e5e5; border-radius:8px; padding:9px 11px; }',
-    '.kpi-label { font-size:8px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:3px; }',
-    '.kpi-value { font-size:20px; font-weight:800; }',
-    '.kpi-var { font-size:9px; font-weight:700; margin-top:3px; }',
-    '.section-title { font-size:12px; font-weight:700; color:#1F3D2E; border-left:4px solid #97A624; padding-left:8px; margin:14px 0 8px; }',
-    'table { width:100%; border-collapse:collapse; font-size:10px; margin-bottom:16px; }',
-    'th { background:#1F3D2E; color:white; font-weight:700; padding:5px 8px; text-align:right; font-size:8px; text-transform:uppercase; }',
-    'th:first-child { text-align:left; }',
-    'td { padding:4px 8px; text-align:right; border-bottom:1px solid #f0f0f0; }',
-    'td:first-child { text-align:left; font-weight:600; }',
-    'tr:nth-child(even) td { background:#fafafa; }',
-    '.tfoot td { background:#f0f4ec !important; font-weight:700; border-top:2px solid #1F3D2E; }',
-    '.pos { color:#16a34a; } .neg { color:#dc2626; }',
-    '.no-print { margin-bottom:14px; display:flex; gap:8px; }',
-    '.footer { margin-top:14px; padding-top:8px; border-top:1px solid #e5e5e5; font-size:8px; color:#999; display:flex; justify-content:space-between; }',
-    '@media print { body { padding:8mm; } .no-print { display:none !important; } @page { size: A4 landscape; margin:8mm; } }',
-  ].join(' ');
+  const css = '* { margin:0; padding:0; box-sizing:border-box; } body { font-family: Arial, sans-serif; font-size: 10px; color: #1a1a1a; background: white; padding: 16px; } .header { display:flex; justify-content:space-between; align-items:center; border-bottom: 3px solid #1F3D2E; padding-bottom: 10px; margin-bottom: 14px; } .header h1 { font-size: 17px; font-weight: 800; color: #1F3D2E; } .header .sub { font-size: 9px; color: #666; margin-top: 2px; } .kpi-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; } .kpi { border:1px solid #e5e5e5; border-radius:8px; padding:9px 11px; } .kpi-label { font-size:8px; font-weight:700; color:#888; text-transform:uppercase; margin-bottom:3px; } .kpi-value { font-size:20px; font-weight:800; } .kpi-var { font-size:9px; font-weight:700; margin-top:3px; } .section-title { font-size:12px; font-weight:700; color:#1F3D2E; border-left:4px solid #97A624; padding-left:8px; margin:14px 0 8px; } table { width:100%; border-collapse:collapse; font-size:10px; margin-bottom:16px; } th { background:#1F3D2E; color:white; font-weight:700; padding:5px 8px; text-align:right; font-size:8px; text-transform:uppercase; } th:first-child { text-align:left; } td { padding:4px 8px; text-align:right; border-bottom:1px solid #f0f0f0; } td:first-child { text-align:left; font-weight:600; } tr:nth-child(even) td { background:#fafafa; } .tfoot td { background:#f0f4ec !important; font-weight:700; border-top:2px solid #1F3D2E; } .pos { color:#16a34a; } .neg { color:#dc2626; } .no-print { margin-bottom:14px; display:flex; gap:8px; } .footer { margin-top:14px; padding-top:8px; border-top:1px solid #e5e5e5; font-size:8px; color:#999; display:flex; justify-content:space-between; } @media print { body { padding:8mm; } .no-print { display:none !important; } @page { size: A4 landscape; margin:8mm; } }';
 
-  // Build KPI cards
-  const kpiCards = data.dias.map(d =>
-    '<div class="kpi">' +
-    '<div class="kpi-label">' + d.label + ' · ' + d.dataFmt + '</div>' +
-    '<div class="kpi-value">' + fmt(d.total26) + '</div>' +
-    (d.yoy !== null ? '<div class="kpi-var ' + (d.yoy>=0?'pos':'neg') + '">' + pct(d.yoy) + ' vs mesmo ' + d.label + ' ' + (d.ano-1) + '</div>' : '') +
-    '</div>'
-  ).join('');
+  const kpiCards = dias.map(function(d) {
+    return '<div class="kpi">' +
+      '<div class="kpi-label">' + d.label + ' · ' + d.dataFmt + '</div>' +
+      '<div class="kpi-value">' + fmt(d.total26) + '</div>' +
+      (d.yoy !== null ? '<div class="kpi-var ' + (d.yoy>=0?'pos':'neg') + '">' + pct(d.yoy) + ' vs ' + d.label + ' ' + (d.ano-1) + '</div>' : '') +
+      '</div>';
+  }).join('');
 
-  // Build tables
-  const tables = data.dias.map(d => {
-    const rows = d.porLoja.map(l =>
-      '<tr>' +
-      '<td>' + l.loja + '</td>' +
-      '<td style="font-weight:700">' + fmt(l.v26) + '</td>' +
-      '<td style="color:#999">' + (l.v25>0 ? fmt(l.v25) : '—') + '</td>' +
-      '<td class="' + (l.yoy>=0?'pos':'neg') + '">' + (l.v25>0 ? pct(l.yoy) : '—') + '</td>' +
-      '<td>' + (d.total26>0 ? (l.v26/d.total26*100).toFixed(1).replace('.',',')+'%' : '—') + '</td>' +
-      '</tr>'
-    ).join('');
+  const tables = dias.map(function(d) {
+    const rows = d.porLoja.map(function(l) {
+      return '<tr><td>' + l.loja + '</td>' +
+        '<td style="font-weight:700">' + fmt(l.v26) + '</td>' +
+        '<td style="color:#999">' + (l.v25>0?fmt(l.v25):'—') + '</td>' +
+        '<td class="' + (l.yoy>=0?'pos':'neg') + '">' + (l.v25>0?pct(l.yoy):'—') + '</td>' +
+        '<td>' + (d.total26>0?(l.v26/d.total26*100).toFixed(1).replace('.',',')+'%':'—') + '</td></tr>';
+    }).join('');
     return '<div class="section-title">' + d.label + ' — ' + d.dataFmt + '</div>' +
       '<table><thead><tr>' +
-      '<th style="text-align:left">Loja</th>' +
-      '<th>' + d.ano + '</th>' +
-      '<th>' + (d.ano-1) + '</th>' +
-      '<th>Variação YoY</th>' +
-      '<th>Share</th>' +
+      '<th style="text-align:left">Loja</th><th>' + d.ano + '</th><th>' + (d.ano-1) + '</th><th>Var. YoY</th><th>Share</th>' +
       '</tr></thead><tbody>' + rows + '</tbody>' +
       '<tfoot><tr class="tfoot">' +
-      '<td>TOTAL</td>' +
-      '<td>' + fmt(d.total26) + '</td>' +
+      '<td>TOTAL</td><td>' + fmt(d.total26) + '</td>' +
       '<td style="color:#666">' + (d.total25>0?fmt(d.total25):'—') + '</td>' +
       '<td class="' + (d.yoy>=0?'pos':'neg') + '">' + pct(d.yoy) + '</td>' +
-      '<td>100%</td>' +
-      '</tr></tfoot></table>';
+      '<td>100%</td></tr></tfoot></table>';
   }).join('');
 
   const html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>' +
-    '<title>Faturamento Final de Semana — Quintal do Espeto</title>' +
+    '<title>FDS Quintal do Espeto</title>' +
     '<style>' + css + '</style></head><body>' +
     '<div class="no-print">' +
-    '<button onclick="window.print()" style="background:#1F3D2E;color:white;border:none;padding:7px 18px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">🖨️ Imprimir / Salvar PDF</button>' +
+    '<button onclick="window.print()" style="background:#1F3D2E;color:white;border:none;padding:7px 18px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">Imprimir</button> ' +
     '<button onclick="window.close()" style="background:#f5f5f5;color:#333;border:1px solid #ddd;padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Fechar</button>' +
     '</div>' +
-    '<div class="header"><div><h1>Quintal do Espeto — Final de Semana</h1>' +
-    '<div class="sub">Faturamento por dia e por casa · Gerado em ' + data.geradoEm + '</div></div>' +
+    '<div class="header"><div>' +
+    '<h1>Quintal do Espeto — Final de Semana</h1>' +
+    '<div class="sub">Gerado em ' + geradoEm + '</div></div>' +
     '<div style="background:#1F3D2E;color:white;padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;">' +
-    data.dias.map(function(d){ return d.label; }).join(' · ') +
-    '</div></div>' +
+    dias.map(function(d){ return d.label; }).join(' · ') + '</div></div>' +
     '<div class="kpi-row">' + kpiCards + '</div>' +
     tables +
-    '<div class="footer"><span>Quintal do Espeto · Relatório de Final de Semana</span><span>' + data.geradoEm + '</span></div>' +
+    '<div class="footer"><span>Quintal do Espeto · Final de Semana</span><span>' + geradoEm + '</span></div>' +
     '</body></html>';
 
   const blob = new Blob([html], { type: 'text/html' });
