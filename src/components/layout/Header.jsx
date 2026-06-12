@@ -290,6 +290,7 @@ export default function Header({ activePage }) {
       )}
       {/* Print trigger */}
       {printing && <PrintReport onClose={() => setPrinting(false)} />}
+      {printingWeekend && <PrintWeekend onClose={() => setPrintingWeekend(false)} />}
     </>
   );
 }
